@@ -61,22 +61,29 @@ impl Chunk {
             }
             prev_line = line;
 
-            match op_code {
-                OpCode::Constant => {
-                    if let OpCode::Index(index) = self.code[op_index + 1] {
-                        let value: f64 = self.constants.get(index);
-                        println!("{}: {:?} {:?} {:?}", identifier, op_code, &self.code[op_index + 1], value);
-                        op_index += 2;
-                    } else {
-                        panic!("Constant OpCode must be followed by Index - {}", identifier)
-                    }
-                },
-                OpCode::Return => {
-                    println!("{}: {:?}", identifier, op_code);
-                    op_index += 1;
-                },
-                _ => panic!("Unsupported OpCode - {}", identifier)
-            }
+            op_index = self.dismantle_op_code(identifier, &op_code, op_index);
+        }
+    }
+
+    fn dismantle_op_code(&self, identifier: String, op_code: &OpCode, op_index: usize) -> usize  {
+        match op_code {
+            OpCode::Constant => {
+                if op_index == self.code.len() - 1 {
+                    panic!("Constant OpCode must be followed by Index - {}", identifier)
+                }
+                else if let OpCode::Index(index) = self.code[op_index + 1] {
+                    let value: f64 = self.constants.get(index);
+                    println!("{}: {:?} {:?} {:?}", identifier, op_code, &self.code[op_index + 1], value);
+                    op_index + 2
+                } else {
+                    panic!("Constant OpCode must be followed by Index - {}", identifier)
+                }
+            },
+            OpCode::Return => {
+                println!("{}: {:?}", identifier, op_code);
+                op_index + 1
+            },
+            _ => panic!("Unsupported OpCode - {} {:?}", identifier, op_code)
         }
     }
 
