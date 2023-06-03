@@ -50,6 +50,7 @@ impl Chunk {
         let mut prev_line: u32 = 0;
         while op_index < self.code.len() {
             let op_code = &self.code[op_index];
+            // If this lines panics, there is something wrong with the implementation
             let line = self.get_line(op_index).unwrap();
 
             let identifier: String;
