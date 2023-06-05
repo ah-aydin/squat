@@ -2,6 +2,8 @@ use crate::{chunk::Chunk, op_code::OpCode};
 
 use log::debug;
 
+const INITIAL_STACK_SIZE: usize = 256;
+
 pub enum InterpretResult {
     InterpretOk,
     InterpretCompileError,
@@ -17,7 +19,7 @@ impl VM {
     pub fn new(chunk: Chunk) -> VM {
         VM {
             chunk,
-            stack: Vec::new()
+            stack: Vec::with_capacity(INITIAL_STACK_SIZE)
         }
     }
 
