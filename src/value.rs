@@ -16,10 +16,6 @@ impl ValueArray {
         self.values.len()
     }
 
-    pub fn free(&mut self) {
-        self.values.clear();
-    }
-
     pub fn get(&self, index: usize) -> f64 {
         if index >= self.values.len() {
             panic!("{} is out of range on ValueArray {}", index, self.name);

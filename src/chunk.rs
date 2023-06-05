@@ -1,6 +1,8 @@
 use crate::value::ValueArray;
 use crate::op_code::OpCode;
 
+use log::debug;
+
 #[derive(Debug, PartialEq)]
 struct Line {
     line: u32,
@@ -24,6 +26,7 @@ impl Line {
 pub struct Chunk {
     name: String,
     code: Vec<OpCode>,
+    pub current_instruction: usize,
     lines: Vec<Line>,
     constants: ValueArray
 }
@@ -33,6 +36,7 @@ impl Chunk {
         Chunk {
             name: String::from(&name) + " chunk",
             code: Vec::new(),
+            current_instruction: 0,
             lines: Vec::new(),
             constants: ValueArray::new(name + " constants")
         }
@@ -43,29 +47,29 @@ impl Chunk {
         self.constants.count() - 1
     }
 
+    pub fn read_constant(&self, index: usize) -> f64 {
+        self.constants.get(index)
+    }
+
     pub fn disassemble(&self) {
-        println!("-- {} --", self.name);
+        debug!("==== {} ====", self.name);
 
         let mut op_index: usize = 0;
-        let mut prev_line: u32 = 0;
         while op_index < self.code.len() {
             let op_code = &self.code[op_index];
-            // If this lines panics, there is something wrong with the implementation
-            let line = self.get_line(op_index).unwrap();
-
-            let identifier: String;
-            if op_index != 0 && line == prev_line {
-                identifier = format!("{:04} {:04}", op_index, "    ");
-            } else {
-                identifier = format!("{:04} {:04}", op_index, line);
-            }
-            prev_line = line;
-
-            op_index = self.dismantle_op_code(identifier, &op_code, op_index);
+            op_index = self.disassemble_instruction(op_code, op_index);
         }
     }
 
-    fn dismantle_op_code(&self, identifier: String, op_code: &OpCode, op_index: usize) -> usize  {
+    pub fn disassemble_current_instruction(&self) {
+        let op_code = &self.code[self.current_instruction];
+        self.disassemble_instruction(op_code, self.current_instruction);
+    }
+
+    fn disassemble_instruction(&self, op_code: &OpCode, op_index: usize) -> usize  {
+        // If this lines panics, there is something wrong with the implementation
+        let identifier = format!("{:04} {:04}", op_index, self.get_line(op_index).unwrap());
+
         match op_code {
             OpCode::Constant => {
                 if op_index == self.code.len() - 1 {
@@ -73,24 +77,17 @@ impl Chunk {
                 }
                 else if let OpCode::Index(index) = self.code[op_index + 1] {
                     let value: f64 = self.constants.get(index);
-                    println!("{}: {:?} {:?} {:?}", identifier, op_code, &self.code[op_index + 1], value);
+                    debug!("{}: {:?} {:?} {:?}", identifier, op_code, &self.code[op_index + 1], value);
                     op_index + 2
                 } else {
                     panic!("Constant OpCode must be followed by Index - {}", identifier)
                 }
             },
-            OpCode::Return => {
-                println!("{}: {:?}", identifier, op_code);
+            _ => {
+                debug!("{}: {:?}", identifier, op_code);
                 op_index + 1
-            },
-            _ => panic!("Unsupported OpCode - {} {:?}", identifier, op_code)
+            }
         }
-    }
-
-    pub fn free(&mut self) {
-        self.code.clear();
-        self.lines.clear();
-        self.constants.free();
     }
 
     fn get_line(&self, op_index: usize) -> Option<u32> {
@@ -105,6 +102,23 @@ impl Chunk {
         }
         
         None
+    }
+
+    pub fn get_name(&self) -> String {
+        self.name.clone()
+    }
+
+    pub fn next(&mut self) -> Option<&OpCode> {
+        if self.current_instruction < self.code.len() {
+            let next_op = &self.code[self.current_instruction];
+            self.current_instruction += 1;
+            return Some(next_op);
+        }
+        None
+    }
+
+    pub fn reset(&mut self) {
+        self.current_instruction = 0;
     }
 
     pub fn write(&mut self, byte: OpCode, line: u32) {

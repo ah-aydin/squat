@@ -3,5 +3,10 @@
 pub enum OpCode {
     Constant,
     Index(usize),
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Negate,
     Return
 }
