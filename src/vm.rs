@@ -1,9 +1,10 @@
-use crate::{chunk::Chunk, op_code::OpCode};
+use crate::{chunk::Chunk, op_code::OpCode, compiler};
 
 use log::debug;
 
 const INITIAL_STACK_SIZE: usize = 256;
 
+#[derive(PartialEq)]
 pub enum InterpretResult {
     InterpretOk,
     InterpretCompileError,
@@ -11,34 +12,37 @@ pub enum InterpretResult {
 }
 
 pub struct VM {
-    chunk: Chunk,
     stack: Vec<f64>
 }
 
 impl VM {
-    pub fn new(chunk: Chunk) -> VM {
+    pub fn new() -> VM {
         VM {
-            chunk,
             stack: Vec::with_capacity(INITIAL_STACK_SIZE)
         }
     }
 
-    pub fn interpret(&mut self) -> InterpretResult {
-        debug!("==== Interpret Chunk {} ====", self.chunk.get_name());
-        self.chunk.reset();
+    pub fn interpret_source(&mut self, source: String) -> InterpretResult {
+        compiler::compile(source);
+        InterpretResult::InterpretOk
+    }
+
+    pub fn interpret_chunk(&mut self, chunk: &mut Chunk) -> InterpretResult {
+        debug!("==== Interpret Chunk {} ====", chunk.get_name());
+        chunk.reset();
 
         loop {
             for value in self.stack.iter() {
                 debug!("[{}]", value);
             }
 
-            self.chunk.disassemble_current_instruction();
-            if let Some(instruction) = self.chunk.next() {
+            chunk.disassemble_current_instruction();
+            if let Some(instruction) = chunk.next() {
                 match instruction {
                     OpCode::Constant => {
-                        if let Some(OpCode::Index(index)) = self.chunk.next() {
+                        if let Some(OpCode::Index(index)) = chunk.next() {
                             let index = *index;
-                            let constant: f64 = self.chunk.read_constant(index);
+                            let constant: f64 = chunk.read_constant(index);
                             self.stack.push(constant);
                         } else {
                             panic!("Constant OpCode must be followed by Index");
@@ -82,4 +86,5 @@ impl VM {
             panic!("Binary operations require 2 values in the stack");
         }
     }
+
 }
