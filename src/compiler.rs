@@ -1,4 +1,5 @@
-use crate::lexer::{TokenType, Lexer};
+use crate::lexer::Lexer;
+use crate::token::TokenType;
 
 use log::error;
 

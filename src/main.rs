@@ -2,13 +2,12 @@ mod chunk;
 mod compiler;
 mod lexer;
 mod op_code;
+mod token;
 mod value;
 mod vm;
 
 use std::{env, fs, io::{self, Write}};
 use log::{debug, error, info};
-use chunk::Chunk;
-use op_code::OpCode;
 use vm::{VM, InterpretResult};
 
 fn repl() {

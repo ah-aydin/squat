@@ -1,37 +1,10 @@
 use std::{str::Chars, iter::Peekable};
 
-#[derive(Debug, PartialEq)]
-pub enum TokenType {
-    // Single-character tokens
-    LeftParenthesis, RightParenthesis, LeftBrace, RightBrace, LeftBracket, RightBracket,
-    Comma, Dot, Minus, Plus, Semicolon, Slash, Star, Colon, Question,
-
-    // One or two character tokens
-    Bang, BangEqual,
-    Equal, EqualEqual,
-    Greater, GreaterEqual,
-    Less, LessEqual,
-
-    // Literals
-    Identifier, String, Number,
-    
-    // Keywords
-    And, Break, Class, Else, Extends, False, For, Func, If, Nil, Or, Print,
-    Return, Static, Super, This, True, Var, While,
-
-    Comment, Eof
-}
-
-#[derive(Debug)]
-pub struct Token {
-    pub token_type: TokenType,
-    lexeme: String,
-    pub line: u32
-}
+use crate::token::{Token, TokenType};
 
 #[derive(Debug)]
 pub enum LexerError {
-    UndefinedToken { line: u32 },
+    UndefinedToken { line: u32, lexeme: String },
     IncompleteComment { line: u32 },
     IncompleteString { line: u32 },
     InternalError { msg: String, line: u32 }
@@ -186,13 +159,15 @@ impl<'a> Lexer<'a> {
                     self.advance();
                     Ok(self.make_token(TokenType::String))
                 },
-                _ => Err(LexerError::UndefinedToken { line: self.line })
+                _ => Err(LexerError::UndefinedToken { line: self.line, lexeme: (self.source[self.start..self.current_index]).to_owned(),  })
             };
         }
 
         Ok(self.make_token(TokenType::Eof))
     }
 
+    /// It can return an optional token of type TokenType::Comment if it has encountered a comment
+    /// It can also return a LexerError if it encounters an incomplete comment
     fn comments_and_whitespaces(&mut self) -> Result<Option<Token>, LexerError> {
         self.start = self.current_index;
         while let Some(c) = self.source_iterator.peek() {
