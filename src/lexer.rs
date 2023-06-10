@@ -202,6 +202,8 @@ impl<'a> Lexer<'a> {
 
                         return Err(LexerError::IncompleteComment { line: self.line })
                     }
+                    // Break here to let it be handled as a Slash token
+                    break;
                 },
                 _ => break
             }

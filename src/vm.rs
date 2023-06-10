@@ -1,4 +1,11 @@
-use crate::{chunk::Chunk, op_code::OpCode, compiler};
+use crate::{
+    chunk::Chunk,
+    op_code::OpCode,
+    compiler::{
+        Compiler,
+        CompileStatus
+    }
+};
 
 use log::debug;
 
@@ -23,8 +30,12 @@ impl VM {
     }
 
     pub fn interpret_source(&mut self, source: String) -> InterpretResult {
-        compiler::compile(source);
-        InterpretResult::InterpretOk
+        let mut chunk = Chunk::new("Base".to_owned());
+        let mut compiler = Compiler::new(&source, &mut chunk);
+        match compiler.compile() {
+            CompileStatus::Success => self.interpret_chunk(&mut chunk),
+            CompileStatus::Fail => InterpretResult::InterpretCompileError
+        }
     }
 
     pub fn interpret_chunk(&mut self, chunk: &mut Chunk) -> InterpretResult {
