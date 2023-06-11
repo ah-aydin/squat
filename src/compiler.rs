@@ -2,6 +2,7 @@ use crate::chunk::Chunk;
 use crate::lexer::Lexer;
 use crate::op_code::OpCode;
 use crate::token::{TokenType, Token};
+use crate::value::SquatValue;
 
 use log::error;
 
@@ -101,7 +102,7 @@ impl<'a> Compiler<'a> {
         let value: f64 = self.previous_token.as_ref().unwrap().lexeme.parse().unwrap();
         let line = self.previous_token.as_ref().unwrap().line;
 
-        let index = self.chunk.add_constant(value);
+        let index = self.chunk.add_constant(SquatValue::F64(value));
         self.chunk.write(OpCode::Constant, line);
         self.chunk.write(OpCode::Index(index), line);
     }

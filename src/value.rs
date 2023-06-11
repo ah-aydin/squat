@@ -1,7 +1,15 @@
+#[derive(Debug, Clone)]
+pub enum SquatValue {
+    Nil,
+    F64(f64),
+    String(String),
+    Bool(bool)
+}
+
 #[derive(Debug)]
 pub struct ValueArray {
     name: String,
-    values: Vec<f64>,
+    values: Vec<SquatValue>,
 }
 
 impl ValueArray {
@@ -16,14 +24,14 @@ impl ValueArray {
         self.values.len()
     }
 
-    pub fn get(&self, index: usize) -> f64 {
+    pub fn get(&self, index: usize) -> &SquatValue {
         if index >= self.values.len() {
             panic!("{} is out of range on ValueArray {}", index, self.name);
         }
-        self.values[index]
+        &self.values[index]
     }
 
-    pub fn write(&mut self, value: f64) {
+    pub fn write(&mut self, value: SquatValue) {
         self.values.push(value);
     }
 }

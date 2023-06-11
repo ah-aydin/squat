@@ -1,4 +1,4 @@
-use crate::value::ValueArray;
+use crate::value::{ValueArray, SquatValue};
 use crate::op_code::OpCode;
 
 use log::debug;
@@ -42,12 +42,12 @@ impl Chunk {
         }
     }
 
-    pub fn add_constant(&mut self, value: f64) -> usize {
+    pub fn add_constant(&mut self, value: SquatValue) -> usize {
         self.constants.write(value);
         self.constants.count() - 1
     }
 
-    pub fn read_constant(&self, index: usize) -> f64 {
+    pub fn read_constant(&self, index: usize) -> &SquatValue {
         self.constants.get(index)
     }
 
@@ -66,6 +66,10 @@ impl Chunk {
         self.disassemble_instruction(op_code, self.current_instruction);
     }
 
+    pub fn get_current_instruction_line(&self) -> u32 {
+        self.get_line(self.current_instruction).unwrap()
+    }
+
     fn disassemble_instruction(&self, op_code: &OpCode, op_index: usize) -> usize  {
         // If this lines panics, there is something wrong with the implementation
         let identifier = format!("{:04} {:04}", op_index, self.get_line(op_index).unwrap());
@@ -76,7 +80,7 @@ impl Chunk {
                     panic!("Constant OpCode must be followed by Index - {}", identifier)
                 }
                 else if let OpCode::Index(index) = self.code[op_index + 1] {
-                    let value: f64 = self.constants.get(index);
+                    let value: &SquatValue = self.constants.get(index);
                     debug!("{}: {:?} {:?} {:?}", identifier, op_code, &self.code[op_index + 1], value);
                     op_index + 2
                 } else {
@@ -130,5 +134,9 @@ impl Chunk {
             }
         }
         self.lines.push(Line::new(line));
+    }
+
+    pub fn clear_instructions(&mut self) {
+        self.code.clear();
     }
 }

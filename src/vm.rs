@@ -4,7 +4,7 @@ use crate::{
     compiler::{
         Compiler,
         CompileStatus
-    }
+    }, value::SquatValue
 };
 
 use log::debug;
@@ -19,42 +19,48 @@ pub enum InterpretResult {
 }
 
 pub struct VM {
-    stack: Vec<f64>
+    stack: Vec<SquatValue>,
+    chunk: Chunk
 }
 
 impl VM {
     pub fn new() -> VM {
         VM {
-            stack: Vec::with_capacity(INITIAL_STACK_SIZE)
+            stack: Vec::with_capacity(INITIAL_STACK_SIZE),
+            chunk: Chunk::new("Base".to_owned())
         }
     }
 
     pub fn interpret_source(&mut self, source: String) -> InterpretResult {
-        let mut chunk = Chunk::new("Base".to_owned());
-        let mut compiler = Compiler::new(&source, &mut chunk);
-        match compiler.compile() {
-            CompileStatus::Success => self.interpret_chunk(&mut chunk),
+        let mut compiler = Compiler::new(&source, &mut self.chunk);
+        let interpret_result = match compiler.compile() {
+            //CompileStatus::Success => self.interpret_chunk(&mut chunk),
+            CompileStatus::Success => self.interpret_chunk(),
             CompileStatus::Fail => InterpretResult::InterpretCompileError
-        }
+        };
+
+        self.chunk.clear_instructions();
+        interpret_result
     }
 
-    pub fn interpret_chunk(&mut self, chunk: &mut Chunk) -> InterpretResult {
-        debug!("==== Interpret Chunk {} ====", chunk.get_name());
-        chunk.reset();
+    pub fn interpret_chunk(&mut self) -> InterpretResult {
+        debug!("==== Interpret Chunk {} ====", self.chunk.get_name());
+        self.chunk.reset();
 
         loop {
             for value in self.stack.iter() {
-                debug!("[{}]", value);
+                debug!("[{:?}]", value);
             }
 
-            chunk.disassemble_current_instruction();
-            if let Some(instruction) = chunk.next() {
+            self.chunk.disassemble_current_instruction();
+            if let Some(instruction) = self.chunk.next() {
                 match instruction {
                     OpCode::Constant => {
-                        if let Some(OpCode::Index(index)) = chunk.next() {
+                        if let Some(OpCode::Index(index)) = self.chunk.next() {
                             let index = *index;
-                            let constant: f64 = chunk.read_constant(index);
-                            self.stack.push(constant);
+                            let constant: &SquatValue = self.chunk.read_constant(index);
+                            self.stack.push(constant.clone()); // TODO figure out a way to get rid
+                                                               // of clone here
                         } else {
                             panic!("Constant OpCode must be followed by Index");
                         }
@@ -64,15 +70,18 @@ impl VM {
                     OpCode::Multiply => self.binary_op(|left, right| left * right),
                     OpCode::Divide => self.binary_op(|left, right| left / right),
                     OpCode::Negate => {
-                        if let Some(value) = self.stack.pop() {
-                            self.stack.push(-value);
+                        if let Some(SquatValue::F64(value)) = self.stack.pop() {
+                            self.stack.push(SquatValue::F64(-value));
                         } else {
-                            panic!("OpCode Negate requires a value in the stack");
+                            report_error(
+                                self.chunk.get_current_instruction_line(),
+                                "Negate must be used on a numeric value"
+                            );
                         }
                     },
                     OpCode::Return => {
                         if let Some(value) = self.stack.pop() {
-                            println!("{}", value);
+                            println!("{:?}", value);
                         }
                         return InterpretResult::InterpretOk;
                     },
@@ -92,10 +101,28 @@ impl VM {
         let left = self.stack.pop();
 
         if left.is_some() && right.is_some() {
-            self.stack.push(op(left.unwrap(), right.unwrap()));
+            if let SquatValue::F64(right) = right.unwrap() {
+                if let SquatValue::F64(left) = left.unwrap() {
+                    self.stack.push(SquatValue::F64(op(left, right)));
+                } else {
+                    report_error(
+                        self.chunk.get_current_instruction_line(),
+                        "Left operand is not a numeric value"
+                    );
+                }
+            }
+            else {
+                report_error(
+                    self.chunk.get_current_instruction_line(),
+                    "Right operand is not a numeric value"
+                );
+            }
         } else {
             panic!("Binary operations require 2 values in the stack");
         }
     }
+}
 
+fn report_error(line: u32, message: &str) {
+    println!("[ERROR] (Line {}) {}", line, message);
 }
