@@ -224,26 +224,26 @@ impl<'a> Lexer<'a> {
 
             let lexeme = self.source.get(self.start..self.current_index).unwrap();
             return match lexeme {
-                "and" => Some(self.make_token(TokenType::And)),
-                "break" => Some(self.make_token(TokenType::Break)),
-                "class" => Some(self.make_token(TokenType::Class)),
-                "else" => Some(self.make_token(TokenType::Else)),
-                "extends" => Some(self.make_token(TokenType::Extends)),
-                "false" => Some(self.make_token(TokenType::False)),
-                "for" => Some(self.make_token(TokenType::For)),
-                "func" => Some(self.make_token(TokenType::Func)),
-                "if" => Some(self.make_token(TokenType::If)),
-                "nil" => Some(self.make_token(TokenType::Nil)),
-                "or" => Some(self.make_token(TokenType::Or)),
-                "print" => Some(self.make_token(TokenType::Print)),
-                "return" => Some(self.make_token(TokenType::Return)),
-                "static" => Some(self.make_token(TokenType::Static)),
-                "super" => Some(self.make_token(TokenType::Super)),
-                "this" => Some(self.make_token(TokenType::This)),
-                "true" => Some(self.make_token(TokenType::True)),
-                "var" => Some(self.make_token(TokenType::Var)),
-                "while" => Some(self.make_token(TokenType::While)),
-                _ => Some(self.make_token(TokenType::Identifier))
+                "and" =>        Some(self.make_token(TokenType::And)),
+                "break" =>      Some(self.make_token(TokenType::Break)),
+                "class" =>      Some(self.make_token(TokenType::Class)),
+                "else" =>       Some(self.make_token(TokenType::Else)),
+                "extends" =>    Some(self.make_token(TokenType::Extends)),
+                "false" =>      Some(self.make_token(TokenType::False)),
+                "for" =>        Some(self.make_token(TokenType::For)),
+                "func" =>       Some(self.make_token(TokenType::Func)),
+                "if" =>         Some(self.make_token(TokenType::If)),
+                "nil" =>        Some(self.make_token(TokenType::Nil)),
+                "or" =>         Some(self.make_token(TokenType::Or)),
+                "print" =>      Some(self.make_token(TokenType::Print)),
+                "return" =>     Some(self.make_token(TokenType::Return)),
+                "static" =>     Some(self.make_token(TokenType::Static)),
+                "super" =>      Some(self.make_token(TokenType::Super)),
+                "this" =>       Some(self.make_token(TokenType::This)),
+                "true" =>       Some(self.make_token(TokenType::True)),
+                "var" =>        Some(self.make_token(TokenType::Var)),
+                "while" =>      Some(self.make_token(TokenType::While)),
+                _ =>            Some(self.make_token(TokenType::Identifier))
             }
         }
         None
