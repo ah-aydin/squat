@@ -73,6 +73,16 @@ impl<'a> Compiler<'a> {
     //////////////////////////////////////////////////////////////////////////
     /// Grammer rules
     //////////////////////////////////////////////////////////////////////////
+    
+    fn parse_precedence(&mut self, precedence: Precedence) {
+        self.advance();
+        self.call_prefix(self.previous_token.as_ref().unwrap().token_type);
+
+        while precedence <= self.get_precedence(self.current_token.as_ref().unwrap().token_type) {
+            self.advance();
+            self.call_infix(self.previous_token.as_ref().unwrap().token_type);
+        }
+    }
 
     fn binary(&mut self) {
         let operation_token = self.previous_token.as_ref().unwrap().clone();
@@ -81,10 +91,18 @@ impl<'a> Compiler<'a> {
         self.parse_precedence(precedence + 1);
 
         match operation_token.token_type {
-            TokenType::Plus => self.chunk.write(OpCode::Add, operation_token.line),
-            TokenType::Minus => self.chunk.write(OpCode::Subtract, operation_token.line),
-            TokenType::Star => self.chunk.write(OpCode::Multiply, operation_token.line),
-            TokenType::Slash => self.chunk.write(OpCode::Divide, operation_token.line),
+            TokenType::Plus =>          self.chunk.write(OpCode::Add, operation_token.line),
+            TokenType::Minus =>         self.chunk.write(OpCode::Subtract, operation_token.line),
+            TokenType::Star =>          self.chunk.write(OpCode::Multiply, operation_token.line),
+            TokenType::Slash =>         self.chunk.write(OpCode::Divide, operation_token.line),
+
+            TokenType::BangEqual =>     self.chunk.write(OpCode::NotEqual, operation_token.line),
+            TokenType::EqualEqual =>    self.chunk.write(OpCode::Equal, operation_token.line),
+            TokenType::Greater =>       self.chunk.write(OpCode::Greater, operation_token.line),
+            TokenType::GreaterEqual =>  self.chunk.write(OpCode::GreaterEqual, operation_token.line),
+            TokenType::Less =>          self.chunk.write(OpCode::Less, operation_token.line),
+            TokenType::LessEqual =>     self.chunk.write(OpCode::LessEqual, operation_token.line),
+
             _ => panic!("Unreachable line")
         }
     }
@@ -98,6 +116,18 @@ impl<'a> Compiler<'a> {
         self.consume(TokenType::RightParenthesis, "Expected closing ')'");
     }
 
+    fn literal(&mut self) {
+        let token_type = self.previous_token.as_ref().unwrap().token_type;
+        let line = self.previous_token.as_ref().unwrap().line;
+
+        match token_type {
+            TokenType::False => self.chunk.write(OpCode::False, line),
+            TokenType::Nil => self.chunk.write(OpCode::Nil, line),
+            TokenType::True => self.chunk.write(OpCode::True, line),
+            _ => panic!("Unreachable line")
+        }
+    }
+
     fn number(&mut self) {
         let value: f64 = self.previous_token.as_ref().unwrap().lexeme.parse().unwrap();
         let line = self.previous_token.as_ref().unwrap().line;
@@ -107,16 +137,6 @@ impl<'a> Compiler<'a> {
         self.chunk.write(OpCode::Index(index), line);
     }
 
-    fn parse_precedence(&mut self, precedence: Precedence) {
-        self.advance();
-        self.call_prefix(self.previous_token.as_ref().unwrap().token_type);
-
-        while precedence <= self.get_precedence(self.current_token.as_ref().unwrap().token_type) {
-            self.advance();
-            self.call_infix(self.previous_token.as_ref().unwrap().token_type);
-        }
-    }
-
     fn unary(&mut self) {
         let token_type = self.previous_token.as_ref().unwrap().token_type;
         let line = self.previous_token.as_ref().unwrap().line;
@@ -124,6 +144,7 @@ impl<'a> Compiler<'a> {
         self.parse_precedence(Precedence::Unary);
 
         match token_type {
+            TokenType::Bang => self.chunk.write(OpCode::Not, line),
             TokenType::Minus => self.chunk.write(OpCode::Negate, line),
             _ => panic!("Unreachable line")
         }
@@ -173,15 +194,19 @@ impl<'a> Compiler<'a> {
     fn call_prefix(&mut self, token_type: TokenType) {
         match token_type {
             TokenType::LeftParenthesis => self.grouping(),
-            TokenType::Minus => self.unary(),
+            TokenType::Bang | TokenType::Minus => self.unary(),
             TokenType::Number => self.number(),
+            TokenType::False | TokenType::Nil | TokenType::True => self.literal(),
             _ => panic!("No prefix is given for {:?}", token_type)
         }
     }
 
     fn call_infix(&mut self, token_type: TokenType) {
         match token_type {
-            TokenType::Minus | TokenType::Plus | TokenType::Slash | TokenType::Star => self.binary(),
+            TokenType::Minus | TokenType::Plus | TokenType::Slash | TokenType::Star |
+            TokenType::BangEqual | TokenType::EqualEqual |
+                TokenType::Greater | TokenType::GreaterEqual |
+                TokenType::Less | TokenType::LessEqual => self.binary(),
             _ => panic!("No prefix is given for {:?}", token_type)
         }
     }
@@ -190,6 +215,9 @@ impl<'a> Compiler<'a> {
         match token_type {
             TokenType::Plus | TokenType::Minus => Precedence::Term,
             TokenType::Star | TokenType::Slash => Precedence::Factor,
+            TokenType::BangEqual | TokenType::EqualEqual => Precedence::Equality,
+            TokenType::Greater | TokenType::GreaterEqual |
+                TokenType::Less | TokenType::LessEqual => Precedence::Comparison,
             _ => Precedence::None
         }
     }
