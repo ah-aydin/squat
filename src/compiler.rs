@@ -1,5 +1,5 @@
 use crate::chunk::Chunk;
-use crate::lexer::Lexer;
+use crate::lexer::{Lexer, LexerError};
 use crate::op_code::OpCode;
 use crate::token::{TokenType, Token};
 use crate::value::SquatValue;
@@ -176,7 +176,16 @@ impl<'a> Compiler<'a> {
                     break;
                 }
                 Err(err) => {
-                    error!("{:?}", err);
+                    match err {
+                        LexerError::UndefinedToken { line, lexeme }
+                            => self.compile_error(line, &format!("undefined token '{}'", lexeme)),
+                        LexerError::IncompleteComment { line }
+                            => self.compile_error(line, "incomplete comment"),
+                        LexerError::IncompleteString { line }
+                            => self.compile_error(line, "incomplete string"),
+                        LexerError::InternalError { msg, line }
+                            => self.compile_error(line, &msg)
+                    };
                 }
             }
         }
@@ -233,5 +242,10 @@ impl<'a> Compiler<'a> {
                 TokenType::Less | TokenType::LessEqual => Precedence::Comparison,
             _ => Precedence::None
         }
+    }
+
+    fn compile_error(&mut self, line: u32, message: &str) {
+        println!("[ERROR] (Line {}) {}", line, message);
+        self.had_error = true;
     }
 }

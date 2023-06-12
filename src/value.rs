@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum SquatValue {
     Nil,
@@ -13,6 +15,17 @@ impl PartialOrd for SquatValue {
             (SquatValue::String(s1), SquatValue::String(s2)) => s1.partial_cmp(s2),
             (SquatValue::Nil, SquatValue::Nil) => Some(std::cmp::Ordering::Equal),
             _ => None
+        }
+    }
+}
+
+impl fmt::Display for SquatValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SquatValue::Nil             => write!(f, "Nil"),
+            SquatValue::Number(value)   => write!(f, "{}", value),
+            SquatValue::Bool(value)     => write!(f, "{}", value),
+            SquatValue::String(value)   => write!(f, "{}", value)
         }
     }
 }

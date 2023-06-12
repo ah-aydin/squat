@@ -127,7 +127,7 @@ impl VM {
 
                     OpCode::Return => {
                         if let Some(value) = self.stack.pop() {
-                            println!("{:?}", value);
+                            println!("{}", value);
                         }
                         return InterpretResult::InterpretOk;
                     },
