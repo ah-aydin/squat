@@ -64,7 +64,6 @@ impl<'a> Lexer<'a> {
                 ',' => Ok(self.make_token(TokenType::Comma)),
                 '.' => Ok(self.make_token(TokenType::Dot)),
                 '-' => Ok(self.make_token(TokenType::Minus)),
-                '+' => Ok(self.make_token(TokenType::Plus)),
                 ';' => Ok(self.make_token(TokenType::Semicolon)),
                 '/' => Ok(self.make_token(TokenType::Slash)),
                 '*' => Ok(self.make_token(TokenType::Star)),
@@ -140,6 +139,24 @@ impl<'a> Lexer<'a> {
                         )
                     }
                 },
+                //'+' => Ok(self.make_token(TokenType::Plus)),
+                '+' => {
+                    if let Some(c) = self.source_iterator.peek() {
+                        if *c == '+' {
+                            self.advance();
+                            Ok(self.make_token(TokenType::PlusPlus))
+                        } else {
+                            Ok(self.make_token(TokenType::Plus))
+                        }
+                    } else {
+                        Err(
+                            LexerError::InternalError {
+                                msg: "Could not peek source_iterator".to_owned(),
+                                line: self.line
+                            }
+                        )
+                    }
+                }
 
                 // Literals
                 '"' => {
@@ -156,8 +173,11 @@ impl<'a> Lexer<'a> {
                         return Err(LexerError::IncompleteString { line: self.line });
                     }
 
+                    // Omit surrounding quotes
+                    self.start += 1;
+                    let token = self.make_token(TokenType::String);
                     self.advance();
-                    Ok(self.make_token(TokenType::String))
+                    Ok(token)
                 },
                 _ => Err(LexerError::UndefinedToken { line: self.line, lexeme: (self.source[self.start..self.current_index]).to_owned(),  })
             };

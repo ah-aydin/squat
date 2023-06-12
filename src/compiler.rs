@@ -92,6 +92,7 @@ impl<'a> Compiler<'a> {
 
         match operation_token.token_type {
             TokenType::Plus =>          self.chunk.write(OpCode::Add, operation_token.line),
+            TokenType::PlusPlus =>      self.chunk.write(OpCode::Concat, operation_token.line),
             TokenType::Minus =>         self.chunk.write(OpCode::Subtract, operation_token.line),
             TokenType::Star =>          self.chunk.write(OpCode::Multiply, operation_token.line),
             TokenType::Slash =>         self.chunk.write(OpCode::Divide, operation_token.line),
@@ -132,7 +133,16 @@ impl<'a> Compiler<'a> {
         let value: f64 = self.previous_token.as_ref().unwrap().lexeme.parse().unwrap();
         let line = self.previous_token.as_ref().unwrap().line;
 
-        let index = self.chunk.add_constant(SquatValue::F64(value));
+        let index = self.chunk.add_constant(SquatValue::Number(value));
+        self.chunk.write(OpCode::Constant, line);
+        self.chunk.write(OpCode::Index(index), line);
+    }
+
+    fn string(&mut self) {
+        let value: String = self.previous_token.as_ref().unwrap().lexeme.clone();
+        let line = self.previous_token.as_ref().unwrap().line;
+
+        let index = self.chunk.add_constant(SquatValue::String(value));
         self.chunk.write(OpCode::Constant, line);
         self.chunk.write(OpCode::Index(index), line);
     }
@@ -197,6 +207,8 @@ impl<'a> Compiler<'a> {
             TokenType::Bang | TokenType::Minus => self.unary(),
             TokenType::Number => self.number(),
             TokenType::False | TokenType::Nil | TokenType::True => self.literal(),
+            TokenType::String => self.string(),
+            TokenType::Comment => return,
             _ => panic!("No prefix is given for {:?}", token_type)
         }
     }
@@ -204,18 +216,19 @@ impl<'a> Compiler<'a> {
     fn call_infix(&mut self, token_type: TokenType) {
         match token_type {
             TokenType::Minus | TokenType::Plus | TokenType::Slash | TokenType::Star |
-            TokenType::BangEqual | TokenType::EqualEqual |
+                TokenType::PlusPlus |
+                TokenType::BangEqual | TokenType::EqualEqual |
                 TokenType::Greater | TokenType::GreaterEqual |
                 TokenType::Less | TokenType::LessEqual => self.binary(),
-            _ => panic!("No prefix is given for {:?}", token_type)
+            _ => panic!("No infix is given for {:?}", token_type)
         }
     }
 
     fn get_precedence(&self, token_type: TokenType) -> Precedence {
         match token_type {
-            TokenType::Plus | TokenType::Minus => Precedence::Term,
-            TokenType::Star | TokenType::Slash => Precedence::Factor,
-            TokenType::BangEqual | TokenType::EqualEqual => Precedence::Equality,
+            TokenType::Plus | TokenType::PlusPlus | TokenType::Minus => Precedence::Term,
+                TokenType::Star | TokenType::Slash => Precedence::Factor,
+                TokenType::BangEqual | TokenType::EqualEqual => Precedence::Equality,
             TokenType::Greater | TokenType::GreaterEqual |
                 TokenType::Less | TokenType::LessEqual => Precedence::Comparison,
             _ => Precedence::None

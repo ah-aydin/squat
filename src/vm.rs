@@ -20,14 +20,16 @@ pub enum InterpretResult {
 
 pub struct VM {
     stack: Vec<SquatValue>,
-    chunk: Chunk
+    chunk: Chunk,
+    had_error: bool
 }
 
 impl VM {
     pub fn new() -> VM {
         VM {
             stack: Vec::with_capacity(INITIAL_STACK_SIZE),
-            chunk: Chunk::new("Base".to_owned())
+            chunk: Chunk::new("Base".to_owned()),
+            had_error: false
         }
     }
 
@@ -54,6 +56,10 @@ impl VM {
             #[cfg(debug_assertions)]
             self.chunk.disassemble_current_instruction();
 
+            if self.had_error {
+                return InterpretResult::InterpretRuntimeError;
+            }
+
             if let Some(instruction) = self.chunk.next() {
                 match instruction {
                     OpCode::Constant => {
@@ -76,6 +82,26 @@ impl VM {
                     OpCode::Multiply => self.binary_op(|left, right| left * right),
                     OpCode::Divide => self.binary_op(|left, right| left / right),
 
+                    OpCode::Concat => {
+                        let right = self.stack.pop();
+                        let left = self.stack.pop();
+
+                        if left.is_some() && right.is_some() {
+                            if let SquatValue::String(right) = right.unwrap() {
+                                if let SquatValue::String(left) = left.unwrap() {
+                                    self.stack.push(SquatValue::String(left + &right));
+                                } else {
+                                    self.runtime_error("Left operand is not a string");
+                                }
+                            }
+                            else {
+                                self.runtime_error("Right operand is not a string");
+                            }
+                        } else {
+                            panic!("Concat operation requires 2 values in the stack");
+                        }
+                    },
+
                     OpCode::Equal => self.binary_cmp(|left, right| left == right),
                     OpCode::NotEqual => self.binary_cmp(|left, right| left != right),
                     OpCode::Greater => self.binary_cmp(|left, right| left > right),
@@ -91,8 +117,8 @@ impl VM {
                         }
                     }
                     OpCode::Negate => {
-                        if let Some(SquatValue::F64(value)) = self.stack.pop() {
-                            self.stack.push(SquatValue::F64(-value));
+                        if let Some(SquatValue::Number(value)) = self.stack.pop() {
+                            self.stack.push(SquatValue::Number(-value));
                         } else {
                             self.runtime_error("Negate must be used on a numeric value");
                             return InterpretResult::InterpretRuntimeError;
@@ -121,9 +147,9 @@ impl VM {
         let left = self.stack.pop();
 
         if left.is_some() && right.is_some() {
-            if let SquatValue::F64(right) = right.unwrap() {
-                if let SquatValue::F64(left) = left.unwrap() {
-                    self.stack.push(SquatValue::F64(op(left, right)));
+            if let SquatValue::Number(right) = right.unwrap() {
+                if let SquatValue::Number(left) = left.unwrap() {
+                    self.stack.push(SquatValue::Number(op(left, right)));
                 } else {
                     self.runtime_error("Left operand is not a numeric value");
                 }
@@ -148,8 +174,9 @@ impl VM {
         }
     }
 
-    fn runtime_error(&self, message: &str) {
+    fn runtime_error(&mut self, message: &str) {
         println!("[ERROR] (Line {}) {}", self.chunk.get_current_instruction_line(), message);
+        self.had_error = true;
     }
 }
 

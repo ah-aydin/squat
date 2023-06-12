@@ -5,11 +5,14 @@ pub enum OpCode {
     
     False, Nil, True,
 
+    Add, Subtract, Multiply, Divide,
+
+    Concat, 
+
     Equal, NotEqual,
     Greater, GreaterEqual,
     Less, LessEqual,
 
-    Add, Subtract, Multiply, Divide,
 
     Not, Negate,
 
