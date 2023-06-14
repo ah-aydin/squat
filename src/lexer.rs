@@ -214,8 +214,11 @@ impl<'a> Lexer<'a> {
                         let mut complete_comment = false;
 
                         while let Some(c) = self.source_iterator.peek() {
+                            if *c == '\n' {
+                                self.line += 1;
+                            }
                             if *c == '*' && self.peek_next("/") {
-                                self.advance();
+                                self.current_index += 1;
                                 complete_comment = true;
                                 break;
                             }
@@ -525,5 +528,51 @@ mod test {
         assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Number, "2"));
         assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Semicolon, ";"));
         assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Eof, ""));
+    }
+
+    #[test]
+    fn mutli_line_with_mulitline_comment() {
+        let code = String::from("var number1 = 1 + 2;/* This is a \n multi \n line \n comment \t\tcomment*/\n  \tvar number2 = 4 / 2;");
+        let mut lexer = Lexer::new(&code);
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Var, "var"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Identifier, "number1"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Equal, "="));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Number, "1"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Plus, "+"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Number, "2"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Semicolon, ";"));
+        assert_eq!(lexer.scan_token(), make_token(TokenType::Var, "var", 5));
+        assert_eq!(lexer.scan_token(), make_token(TokenType::Identifier, "number2", 5));
+        assert_eq!(lexer.scan_token(), make_token(TokenType::Equal, "=", 5));
+        assert_eq!(lexer.scan_token(), make_token(TokenType::Number, "4", 5));
+        assert_eq!(lexer.scan_token(), make_token(TokenType::Slash, "/", 5));
+        assert_eq!(lexer.scan_token(), make_token(TokenType::Number, "2", 5));
+        assert_eq!(lexer.scan_token(), make_token(TokenType::Semicolon, ";", 5));
+        assert_eq!(lexer.scan_token(), make_token(TokenType::Eof, "", 5));
+    }
+
+    #[test]
+    fn detects_incomplete_multi_line_comment() {
+        let code = String::from("var number1 = 1 + 2;/* This is an incomplete \n multi line \n comment \t\tcomment*\nvar number2 = 4 / 2;");
+        let mut lexer = Lexer::new(&code);
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Var, "var"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Identifier, "number1"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Equal, "="));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Number, "1"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Plus, "+"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Number, "2"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Semicolon, ";"));
+        assert_eq!(lexer.scan_token(), Err(LexerError::IncompleteComment { line: 4 }));
+        assert_eq!(lexer.scan_token(), make_token(TokenType::Eof, "", 4));
+    }
+
+    #[test]
+    fn detects_incomplete_string() {
+        let code = String::from("var s = \"gigel;");
+        let mut lexer = Lexer::new(&code);
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Var, "var"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Identifier, "s"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Equal, "="));
+        assert_eq!(lexer.scan_token(), Err(LexerError::IncompleteString { line: 1}));
     }
 }
