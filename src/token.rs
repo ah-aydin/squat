@@ -19,10 +19,10 @@ pub enum TokenType {
     And, Break, Class, Else, Extends, False, For, Func, If, Nil, Or, Print,
     Return, Static, Super, This, True, Var, While,
 
-    Comment, Eof
+    Eof
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub token_type: TokenType,
     pub lexeme: String,

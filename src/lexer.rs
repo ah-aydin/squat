@@ -2,7 +2,7 @@ use std::{str::Chars, iter::Peekable};
 
 use crate::token::{Token, TokenType};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum LexerError {
     UndefinedToken { line: u32, lexeme: String },
     IncompleteComment { line: u32 },
@@ -139,7 +139,6 @@ impl<'a> Lexer<'a> {
                         )
                     }
                 },
-                //'+' => Ok(self.make_token(TokenType::Plus)),
                 '+' => {
                     if let Some(c) = self.source_iterator.peek() {
                         if *c == '+' {
@@ -204,26 +203,31 @@ impl<'a> Lexer<'a> {
                     if self.peek_next("/") { // Single line
                         while let Some(c) = self.source_iterator.peek() {
                             if *c == '\n' {
+                                self.line += 1;
+                                self.current_index += 1;
+                                break;
+                            }
+                            self.advance();
+                        }
+                    } else if self.peek_next("*") { // Multi line
+                        self.advance(); // Skip '*'
+                        let mut complete_comment = false;
+
+                        while let Some(c) = self.source_iterator.peek() {
+                            if *c == '*' && self.peek_next("/") {
+                                self.advance();
+                                complete_comment = true;
                                 break;
                             }
                             self.advance();
                         }
 
-                        return Ok(Some(self.make_token(TokenType::Comment)));
-                    } else if self.peek_next("*") { // Multi line
-                        self.advance();
-                        while let Some(c) = self.source_iterator.peek() {
-                            if *c == '*' && self.peek_next("/") {
-                                self.advance();
-                                return Ok(Some(self.make_token(TokenType::Comment)));
-                            }
-                            self.advance();
+                        if !complete_comment {
+                            return Err(LexerError::IncompleteComment { line: self.line })
                         }
-
-                        return Err(LexerError::IncompleteComment { line: self.line })
+                    } else {
+                        break; // Break here to let it be handled as a Slash token
                     }
-                    // Break here to let it be handled as a Slash token
-                    break;
                 },
                 _ => break
             }
@@ -322,5 +326,204 @@ impl<'a> Lexer<'a> {
 
     fn is_at_end(&self) -> bool {
         self.current_index >= self.source.len()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::token::{Token, TokenType};
+
+    fn make_token_line_1(token_type: TokenType, lexeme: &str) -> Result<Token, LexerError> {
+        make_token(token_type, lexeme, 1)
+    }
+
+    fn make_token_line_2(token_type: TokenType, lexeme: &str) -> Result<Token, LexerError> {
+        make_token(token_type, lexeme, 2)
+    }
+
+    fn make_token_line_3(token_type: TokenType, lexeme: &str) -> Result<Token, LexerError> {
+        make_token(token_type, lexeme, 3)
+    }
+
+    fn make_token(token_type: TokenType,lexeme: &str, line: u32) -> Result<Token, LexerError> {
+        Ok(Token {
+            token_type,
+            lexeme: lexeme.to_owned(),
+            line
+        })
+    }
+
+    fn test_binary_operand(token_type: TokenType, lexeme: &str) {
+        let code = String::from(format!("1 {} 2", lexeme));
+        let mut lexer = Lexer::new(&code);
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Number, "1"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(token_type, lexeme));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Number, "2"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Eof, ""));
+    }
+
+    fn test_unary_operand(token_type: TokenType, lexeme: &str) {
+        let code = String::from(format!("{}1", lexeme));
+        let mut lexer = Lexer::new(&code);
+        assert_eq!(lexer.scan_token(), make_token_line_1(token_type, lexeme));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Number, "1"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Eof, ""));
+    }
+
+    #[test]
+    fn single_character_tokens() {
+        let code = String::from("( ) { } [ ] , . ; : ?");
+        let mut lexer = Lexer::new(&code);
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::LeftParenthesis, "("));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::RightParenthesis, ")"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::LeftBrace, "{"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::RightBrace, "}"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::LeftBracket, "["));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::RightBracket, "]"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Comma, ","));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Dot, "."));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Semicolon, ";"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Colon, ":"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Question, "?"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Eof, ""));
+
+        test_unary_operand(TokenType::Minus, "-");
+        test_binary_operand(TokenType::Minus, "-");
+        test_binary_operand(TokenType::Star, "*");
+        test_binary_operand(TokenType::Slash, "/");
+    }
+
+    #[test]
+    fn one_or_two_character_tokens() {
+        test_unary_operand(TokenType::Bang, "!");
+        test_binary_operand(TokenType::BangEqual, "!=");
+        test_binary_operand(TokenType::Equal, "=");
+        test_binary_operand(TokenType::EqualEqual, "==");
+        test_binary_operand(TokenType::Greater, ">");
+        test_binary_operand(TokenType::GreaterEqual, ">=");
+        test_binary_operand(TokenType::Less, "<");
+        test_binary_operand(TokenType::LessEqual, "<=");
+        test_binary_operand(TokenType::Plus, "+");
+        test_binary_operand(TokenType::PlusPlus, "++");
+    }
+
+    #[test]
+    fn literals() {
+        let code = String::from("variable1 variable2 5 kebab chef");
+        let mut lexer = Lexer::new(&code);
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Identifier, "variable1"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Identifier, "variable2"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Number, "5"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Identifier, "kebab"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Identifier, "chef"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Eof, ""));
+        
+        let code = String::from("\"kebab\" \"chef\" makes food");
+        let mut lexer = Lexer::new(&code);
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::String, "kebab"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::String, "chef"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Identifier, "makes"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Identifier, "food"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Eof, ""));
+    }
+
+    #[test]
+    fn keywords() {
+        let code = String::from("and break class else extends false for func if nil or print return static super this true var while");
+        let mut lexer = Lexer::new(&code);
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::And, "and"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Break, "break"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Class, "class"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Else, "else"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Extends, "extends"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::False, "false"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::For, "for"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Func, "func"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::If, "if"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Nil, "nil"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Or, "or"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Print, "print"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Return, "return"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Static, "static"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Super, "super"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::This, "this"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::True, "true"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Var, "var"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::While, "while"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Eof, ""));
+    }
+
+    #[test]
+    fn single_line_comment() {
+        let code = String::from("var number1 = 1 + 2;// This is a comment");
+        let mut lexer = Lexer::new(&code);
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Var, "var"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Identifier, "number1"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Equal, "="));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Number, "1"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Plus, "+"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Number, "2"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Semicolon, ";"));
+    }
+
+    #[test]
+    fn multi_line() {
+        let code = String::from("var number1 = 1 + 2;\n\tvar number2 = 4 / 2;");
+        let mut lexer = Lexer::new(&code);
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Var, "var"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Identifier, "number1"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Equal, "="));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Number, "1"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Plus, "+"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Number, "2"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Semicolon, ";"));
+        assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Var, "var"));
+        assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Identifier, "number2"));
+        assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Equal, "="));
+        assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Number, "4"));
+        assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Slash, "/"));
+        assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Number, "2"));
+        assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Semicolon, ";"));
+        assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Eof, ""));
+    }
+
+    #[test]
+    fn multi_line_with_single_line_comment() {
+        let code = String::from("var number1 = 1 + 2;\n// This is a comment\nvar number2 = 4 / 2;");
+        let mut lexer = Lexer::new(&code);
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Var, "var"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Identifier, "number1"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Equal, "="));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Number, "1"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Plus, "+"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Number, "2"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Semicolon, ";"));
+        assert_eq!(lexer.scan_token(), make_token_line_3(TokenType::Var, "var"));
+        assert_eq!(lexer.scan_token(), make_token_line_3(TokenType::Identifier, "number2"));
+        assert_eq!(lexer.scan_token(), make_token_line_3(TokenType::Equal, "="));
+        assert_eq!(lexer.scan_token(), make_token_line_3(TokenType::Number, "4"));
+        assert_eq!(lexer.scan_token(), make_token_line_3(TokenType::Slash, "/"));
+        assert_eq!(lexer.scan_token(), make_token_line_3(TokenType::Number, "2"));
+        assert_eq!(lexer.scan_token(), make_token_line_3(TokenType::Semicolon, ";"));
+        assert_eq!(lexer.scan_token(), make_token_line_3(TokenType::Eof, ""));
+
+        let code = String::from("var number1 = 1 + 2;\t\t\t   // This is a comment\nvar number2 = 4 / 2;");
+        let mut lexer = Lexer::new(&code);
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Var, "var"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Identifier, "number1"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Equal, "="));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Number, "1"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Plus, "+"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Number, "2"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Semicolon, ";"));
+        assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Var, "var"));
+        assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Identifier, "number2"));
+        assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Equal, "="));
+        assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Number, "4"));
+        assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Slash, "/"));
+        assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Number, "2"));
+        assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Semicolon, ";"));
+        assert_eq!(lexer.scan_token(), make_token_line_2(TokenType::Eof, ""));
     }
 }
