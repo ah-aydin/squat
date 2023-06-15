@@ -217,6 +217,7 @@ impl<'a> Compiler<'a> {
             TokenType::Number => self.number(),
             TokenType::False | TokenType::Nil | TokenType::True => self.literal(),
             TokenType::String => self.string(),
+            TokenType::Eof => return,
             _ => panic!("No prefix is given for {:?}", token_type)
         }
     }
