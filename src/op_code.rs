@@ -13,7 +13,6 @@ pub enum OpCode {
     Greater, GreaterEqual,
     Less, LessEqual,
 
-
     Not, Negate,
 
     Return

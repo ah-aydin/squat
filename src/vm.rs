@@ -49,6 +49,7 @@ impl VM {
         self.chunk.reset();
 
         loop {
+            #[cfg(debug_assertions)]
             for value in self.stack.iter() {
                 debug!("[{:?}]", value);
             }

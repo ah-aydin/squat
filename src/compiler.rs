@@ -249,3 +249,157 @@ impl<'a> Compiler<'a> {
         self.had_error = true;
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn interpret_binary_op_code(chunk: &mut Chunk, op_code: OpCode) {
+        assert_eq!(chunk.next(), Some(&OpCode::Constant));        
+        assert_eq!(chunk.next(), Some(&OpCode::Index(0)));
+        assert_eq!(chunk.next(), Some(&OpCode::Constant));
+        assert_eq!(chunk.next(), Some(&OpCode::Index(1)));
+        assert_eq!(chunk.next(), Some(&op_code));
+    }
+
+    #[test]
+    fn op_false() {
+        let mut chunk = Chunk::new("True".to_owned());
+        let source = String::from("false");
+        let mut compiler = Compiler::new(&source, &mut chunk);
+        compiler.compile();
+        assert_eq!(chunk.next(), Some(&OpCode::False));
+    }
+
+    #[test]
+    fn op_true() {
+        let mut chunk = Chunk::new("True".to_owned());
+        let source = String::from("true");
+        let mut compiler = Compiler::new(&source, &mut chunk);
+        compiler.compile();
+        assert_eq!(chunk.next(), Some(&OpCode::));
+    }
+
+    #[test]
+    fn add() {
+        let mut chunk = Chunk::new("Addition".to_owned());
+        let source = String::from("1 + 2");
+        let mut compiler = Compiler::new(&source, &mut chunk);
+        compiler.compile();
+        interpret_binary_op_code(&mut chunk, OpCode::Add);
+    }
+
+    #[test]
+    fn subract() {
+        let mut chunk = Chunk::new("Subtraction".to_owned());
+        let source = String::from("1 - 2");
+        let mut compiler = Compiler::new(&source, &mut chunk);
+        compiler.compile();
+        interpret_binary_op_code(&mut chunk, OpCode::Subtract);
+    }
+
+    #[test]
+    fn multiply() {
+        let mut chunk = Chunk::new("Multiply".to_owned());
+        let source = String::from("1 * 2");
+        let mut compiler = Compiler::new(&source, &mut chunk);
+        compiler.compile();
+        interpret_binary_op_code(&mut chunk, OpCode::Multiply);
+    }
+
+    #[test]
+    fn divide() {
+        let mut chunk = Chunk::new("Divide".to_owned());
+        let source = String::from("1 / 2");
+        let mut compiler = Compiler::new(&source, &mut chunk);
+        compiler.compile();
+        interpret_binary_op_code(&mut chunk, OpCode::Divide);
+    }
+
+    #[test]
+    fn concat() {
+        let mut chunk = Chunk::new("Concat".to_owned());
+        let source = String::from("\"a\" ++ \"a\"");
+        let mut compiler = Compiler::new(&source, &mut chunk);
+        compiler.compile();
+        interpret_binary_op_code(&mut chunk, OpCode::Concat);
+    }
+
+    #[test]
+    fn equal() {
+        let mut chunk = Chunk::new("Equal".to_owned());
+        let source = String::from("1 == 2");
+        let mut compiler = Compiler::new(&source, &mut chunk);
+        compiler.compile();
+        interpret_binary_op_code(&mut chunk, OpCode::Equal);
+    }
+
+    #[test]
+    fn not_equal() {
+        let mut chunk = Chunk::new("Not Equal".to_owned());
+        let source = String::from("1 != 2");
+        let mut compiler = Compiler::new(&source, &mut chunk);
+        compiler.compile();
+        interpret_binary_op_code(&mut chunk, OpCode::NotEqual);
+    }
+
+    #[test]
+    fn greater() {
+        let mut chunk = Chunk::new("Greater".to_owned());
+        let source = String::from("1 > 2");
+        let mut compiler = Compiler::new(&source, &mut chunk);
+        compiler.compile();
+        interpret_binary_op_code(&mut chunk, OpCode::Greater);
+    }
+
+    #[test]
+    fn greater_equal() {
+        let mut chunk = Chunk::new("Greater Equal".to_owned());
+        let source = String::from("1 >= 2");
+        let mut compiler = Compiler::new(&source, &mut chunk);
+        compiler.compile();
+        interpret_binary_op_code(&mut chunk, OpCode::GreaterEqual);
+    }
+
+    #[test]
+    fn less() {
+        let mut chunk = Chunk::new("Less".to_owned());
+        let source = String::from("1 < 2");
+        let mut compiler = Compiler::new(&source, &mut chunk);
+        compiler.compile();
+        interpret_binary_op_code(&mut chunk, OpCode::Less);
+    }
+
+    #[test]
+    fn less_equal() {
+        let mut chunk = Chunk::new("Less Equal".to_owned());
+        let source = String::from("1 <= 2");
+        let mut compiler = Compiler::new(&source, &mut chunk);
+        compiler.compile();
+        interpret_binary_op_code(&mut chunk, OpCode::LessEqual);
+    }
+
+    #[test]
+    fn not() {
+        let mut chunk = Chunk::new("Less Equal".to_owned());
+        let source = String::from("!1");
+        let mut compiler = Compiler::new(&source, &mut chunk);
+        compiler.compile();
+        assert_eq!(chunk.next(), Some(&OpCode::Constant));
+        assert_eq!(chunk.next(), Some(&OpCode::Index(0)));
+        assert_eq!(chunk.next(), Some(&OpCode::Not));
+    }
+
+    #[test]
+    fn negate() {
+        let mut chunk = Chunk::new("Less Equal".to_owned());
+        let source = String::from("-1");
+        let mut compiler = Compiler::new(&source, &mut chunk);
+        compiler.compile();
+        assert_eq!(chunk.next(), Some(&OpCode::Constant));
+        assert_eq!(chunk.next(), Some(&OpCode::Index(0)));
+        assert_eq!(chunk.next(), Some(&OpCode::Negate));
+    }
+
+    // TODO add more specific tests when not in flight and your brain can work
+}
