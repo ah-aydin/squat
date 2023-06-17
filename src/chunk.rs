@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-
 use crate::value::{ValueArray, SquatValue};
 use crate::op_code::OpCode;
 
+#[cfg(debug_assertions)]
 use log::debug;
 
 #[derive(Debug, PartialEq)]
@@ -52,6 +51,7 @@ impl Chunk {
         self.constants.get(index)
     }
 
+    #[cfg(debug_assertions)]
     pub fn disassemble(&self) {
         debug!("==== {} ====", self.name);
 
@@ -62,6 +62,7 @@ impl Chunk {
         }
     }
 
+    #[cfg(debug_assertions)]
     pub fn disassemble_current_instruction(&self) {
         let op_code = &self.code[self.current_instruction];
         self.disassemble_instruction(op_code, self.current_instruction);
@@ -71,6 +72,7 @@ impl Chunk {
         self.get_line(self.current_instruction).unwrap()
     }
 
+    #[cfg(debug_assertions)]
     fn disassemble_instruction(&self, op_code: &OpCode, op_index: usize) -> usize  {
         // If this lines panics, there is something wrong with the implementation
         let identifier = format!("{:04} {:04}", op_index, self.get_line(op_index).unwrap());
@@ -85,6 +87,7 @@ impl Chunk {
         }
     }
 
+    #[cfg(debug_assertions)]
     fn constant_instruction(&self, op_code: &OpCode, op_index: usize, identifier: &String) -> usize {
         if op_index == self.code.len() - 1 {
             panic!("{:?} must be followed by Index - {}", op_code, identifier)

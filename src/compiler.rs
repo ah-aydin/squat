@@ -6,7 +6,8 @@ use crate::op_code::OpCode;
 use crate::token::{TokenType, Token};
 use crate::value::SquatValue;
 
-use log::{error, debug};
+#[cfg(debug_assertions)]
+use log::debug;
 
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 #[repr(u8)]

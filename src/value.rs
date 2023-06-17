@@ -50,10 +50,6 @@ impl ValueArray {
         }
     }
 
-    pub fn count(&self) -> usize {
-        self.values.len()
-    }
-
     pub fn get(&self, index: usize) -> &SquatValue {
         if index >= self.values.len() {
             panic!("{} is out of range on ValueArray {}", index, self.name);
