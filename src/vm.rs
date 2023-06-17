@@ -34,7 +34,7 @@ impl VM {
             stack: Vec::with_capacity(INITIAL_STACK_SIZE),
             globals: vec![None; INITIAL_STACK_SIZE],
             global_variable_indicies: HashMap::new(),
-            chunk: Chunk::new("Base".to_owned()),
+            chunk: Chunk::new("Main".to_owned()),
             had_error: false
         }
     }
@@ -50,7 +50,7 @@ impl VM {
         interpret_result
     }
 
-    pub fn interpret_chunk(&mut self) -> InterpretResult {
+    fn interpret_chunk(&mut self) -> InterpretResult {
         debug!("==== Interpret Chunk {} ====", self.chunk.get_name());
         self.chunk.reset();
 
@@ -176,7 +176,6 @@ impl VM {
                             let index = *index;
                             if let Some(value) = self.stack.last() {
                                 if let Some(Some(_value)) = self.globals.get(index) {
-                                    //self.globals_vec.insert(index, Some(value.clone()));
                                     self.globals[index] = Some(value.clone());
                                 } else {
                                     self.runtime_error(&format!("Variable with index {} is not defined", index));

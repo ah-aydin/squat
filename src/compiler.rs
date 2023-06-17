@@ -313,7 +313,9 @@ impl<'a> Compiler<'a> {
                 self.advance();
                 return;
             }
-            self.error_at_token(message);
+            let line = self.previous_token.as_ref().unwrap().line;
+            let lexeme = &self.previous_token.as_ref().unwrap().lexeme;
+            self.compile_error(line, &format!("Error at '{}': {}", lexeme, message));
             return;
         }
         panic!("Unreachable line");
@@ -344,14 +346,6 @@ impl<'a> Compiler<'a> {
             }
             self.advance();
         }
-    }
-
-    fn error_at_token(&mut self, message: &str) {
-        let line = self.previous_token.as_ref().unwrap().line;
-        let lexeme = &self.previous_token.as_ref().unwrap().lexeme;
-        error!("[Line: {}] Error at '{}': {}", line, lexeme, message);
-        self.had_error = true;
-        self.panic_mode = true;
     }
 
     fn call_prefix(&mut self, token_type: TokenType) {
