@@ -75,22 +75,25 @@ impl Chunk {
         let identifier = format!("{:04} {:04}", op_index, self.get_line(op_index).unwrap());
 
         match op_code {
-            OpCode::Constant => {
-                if op_index == self.code.len() - 1 {
-                    panic!("Constant OpCode must be followed by Index - {}", identifier)
-                }
-                else if let OpCode::Index(index) = self.code[op_index + 1] {
-                    let value: &SquatValue = self.constants.get(index);
-                    debug!("{}: {:?} {:?} {:?}", identifier, op_code, &self.code[op_index + 1], value);
-                    op_index + 2
-                } else {
-                    panic!("Constant OpCode must be followed by Index - {}", identifier)
-                }
-            },
+            OpCode::Constant | OpCode::DefineGlobal | OpCode::GetGlobal | OpCode::SetGlobal 
+                => self.constant_instruction(op_code, op_index, &identifier),
             _ => {
                 debug!("{}: {:?}", identifier, op_code);
                 op_index + 1
             }
+        }
+    }
+
+    fn constant_instruction(&self, op_code: &OpCode, op_index: usize, identifier: &String) -> usize {
+        if op_index == self.code.len() - 1 {
+            panic!("{:?} must be followed by Index - {}", op_code, identifier)
+        }
+        else if let OpCode::Index(index) = self.code[op_index + 1] {
+            let value: &SquatValue = self.constants.get(index);
+            debug!("{}: {:?} {:?} {:?}", identifier, op_code, &self.code[op_index + 1], value);
+            op_index + 2
+        } else {
+            panic!("{:?} must be followed by Index - {}", op_code, identifier)
         }
     }
 

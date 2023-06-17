@@ -44,7 +44,8 @@ pub struct Compiler<'a> {
     chunk: &'a mut Chunk,
     previous_token: Option<Token>,
     current_token: Option<Token>,
-    had_error: bool
+    had_error: bool,
+    panic_mode: bool
 }
 
 impl<'a> Compiler<'a> {
@@ -54,14 +55,21 @@ impl<'a> Compiler<'a> {
             chunk,
             previous_token: None,
             current_token: None,
-            had_error: false
+            had_error: false,
+            panic_mode: false
         }
     }
 
     pub fn compile(&mut self) -> CompileStatus {
         self.advance();
-        self.expression();
-        self.consume(TokenType::Eof, "Expected end of expression");
+
+        while !self.check_current(TokenType::Eof) {
+            self.declaration();
+        }
+
+        //self.expression();
+        //self.consume(TokenType::Eof, "Expected end of expression");
+
         self.chunk.write(OpCode::Return, self.current_token.as_ref().unwrap().line);
 
         if self.had_error {
@@ -71,17 +79,86 @@ impl<'a> Compiler<'a> {
     }
 
     //////////////////////////////////////////////////////////////////////////
-    /// Grammer rules
+    /// Statement rules
+    //////////////////////////////////////////////////////////////////////////
+    
+    fn declaration(&mut self) {
+        if self.check_current(TokenType::Var) {
+            self.var_declaration();
+        } else {
+            self.statement();
+        }
+
+        if self.panic_mode {
+            self.panic_mode = false;
+            self.synchronize();
+        }
+    }
+
+    fn var_declaration(&mut self) {
+        let line = self.previous_token.as_ref().unwrap().line;
+        let global = self.parse_variable("Expect variable name");
+
+        if self.check_current(TokenType::Equal) {
+            self.expression();
+        } else {
+            self.chunk.write(OpCode::Nil, line);
+        }
+
+        self.consume(TokenType::Semicolon, "Expect ';' after variable declaration.");
+
+        self.define_variable(global);
+    }
+
+    fn statement(&mut self) {
+        if self.check_current(TokenType::Print) {
+            self.print_statement()
+        } else {
+            self.expression_statement();
+        }
+    }
+
+    fn print_statement(&mut self) {
+        let line = self.previous_token.as_ref().unwrap().line;
+
+        self.expression();
+        self.consume(TokenType::Semicolon, "Expect ';' after value.");
+        self.chunk.write(OpCode::Print, line);
+    }
+
+    fn expression_statement(&mut self) {
+        let line = self.current_token.as_ref().unwrap().line;
+
+        self.expression();
+        self.consume(TokenType::Semicolon, "Expect ';' after expression");
+        self.chunk.write(OpCode::Pop, line);
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    /// Expression rules
     //////////////////////////////////////////////////////////////////////////
     
     fn parse_precedence(&mut self, precedence: Precedence) {
         self.advance();
         self.call_prefix(self.previous_token.as_ref().unwrap().token_type);
 
+        //let can_assign = self.get_precedence(self.previous_token.as_ref().unwrap().token_type) <= Precedence::Assignment;
+
         while precedence <= self.get_precedence(self.current_token.as_ref().unwrap().token_type) {
             self.advance();
             self.call_infix(self.previous_token.as_ref().unwrap().token_type);
         }
+    }
+
+    fn parse_variable(&mut self, error_msg: &str) -> usize {
+        self.consume(TokenType::Identifier, error_msg);
+        self.chunk.add_constant(SquatValue::String(self.previous_token.as_ref().unwrap().lexeme.clone()))
+    }
+
+    fn define_variable(&mut self, global: usize) {
+        let line = self.previous_token.as_ref().unwrap().line;
+        self.chunk.write(OpCode::DefineGlobal, line);
+        self.chunk.write(OpCode::Index(global), line);
     }
 
     fn binary(&mut self) {
@@ -160,6 +237,21 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    fn variable(&mut self) {
+        let line = self.previous_token.as_ref().unwrap().line;
+
+        let arg = self.chunk.add_constant(SquatValue::String(self.previous_token.as_ref().unwrap().lexeme.clone()));
+
+        if self.check_current(TokenType::Equal) {
+            self.expression();
+            self.chunk.write(OpCode::SetGlobal, line);
+            self.chunk.write(OpCode::Index(arg), line);
+        } else {
+            self.chunk.write(OpCode::GetGlobal, line);
+            self.chunk.write(OpCode::Index(arg), line);
+        }
+    }
+
     //////////////////////////////////////////////////////////////////////////
     /// Helper functions
     //////////////////////////////////////////////////////////////////////////
@@ -192,8 +284,8 @@ impl<'a> Compiler<'a> {
     }
 
     fn consume(&mut self, expected_type: TokenType, message: &str) {
-        if self.current_token.is_some() {
-            if self.current_token.as_ref().unwrap().token_type == expected_type {
+        if let Some(token) = &self.current_token {
+            if token.token_type == expected_type {
                 self.advance();
                 return;
             }
@@ -202,12 +294,40 @@ impl<'a> Compiler<'a> {
         }
         panic!("Unreachable line");
     }
+    
+    fn check_current(&mut self, expected_type: TokenType) -> bool {
+        if let Some(token) = &self.current_token {
+            if token.token_type == expected_type {
+                self.advance();
+                return true;
+            }
+        }
+        false
+    }
+
+    fn synchronize(&mut self) {
+        self.panic_mode = false;
+        while self.current_token.as_ref().unwrap().token_type != TokenType::Eof {
+            if self.previous_token.as_ref().unwrap().token_type == TokenType::Semicolon {
+                break;
+            }
+            match self.current_token.as_ref().unwrap().token_type {
+                TokenType::Class | TokenType::Func | TokenType::Var | TokenType::For |
+                    TokenType::If | TokenType::While | TokenType::Print | TokenType::Return => {
+                        break;
+                    }
+                _ => {}
+            }
+            self.advance();
+        }
+    }
 
     fn error_at_token(&mut self, message: &str) {
-        let line = self.current_token.as_ref().unwrap().line;
-        let lexeme = &self.current_token.as_ref().unwrap().lexeme;
+        let line = self.previous_token.as_ref().unwrap().line;
+        let lexeme = &self.previous_token.as_ref().unwrap().lexeme;
         error!("[Line: {}] Error at '{}': {}", line, lexeme, message);
         self.had_error = true;
+        self.panic_mode = true;
     }
 
     fn call_prefix(&mut self, token_type: TokenType) {
@@ -217,6 +337,7 @@ impl<'a> Compiler<'a> {
             TokenType::Number => self.number(),
             TokenType::False | TokenType::Nil | TokenType::True => self.literal(),
             TokenType::String => self.string(),
+            TokenType::Identifier => self.variable(),
             TokenType::Eof => return,
             _ => panic!("No prefix is given for {:?}", token_type)
         }
@@ -247,6 +368,7 @@ impl<'a> Compiler<'a> {
     fn compile_error(&mut self, line: u32, message: &str) {
         println!("[ERROR] (Line {}) {}", line, message);
         self.had_error = true;
+        self.panic_mode = true;
     }
 }
 
@@ -277,7 +399,7 @@ mod test {
         let source = String::from("true");
         let mut compiler = Compiler::new(&source, &mut chunk);
         compiler.compile();
-        assert_eq!(chunk.next(), Some(&OpCode::));
+        assert_eq!(chunk.next(), Some(&OpCode::True));
     }
 
     #[test]

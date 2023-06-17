@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     chunk::Chunk,
     op_code::OpCode,
@@ -20,6 +22,7 @@ pub enum InterpretResult {
 
 pub struct VM {
     stack: Vec<SquatValue>,
+    globals: HashMap<String, SquatValue>,
     chunk: Chunk,
     had_error: bool
 }
@@ -28,6 +31,7 @@ impl VM {
     pub fn new() -> VM {
         VM {
             stack: Vec::with_capacity(INITIAL_STACK_SIZE),
+            globals: HashMap::new(),
             chunk: Chunk::new("Base".to_owned()),
             had_error: false
         }
@@ -126,10 +130,69 @@ impl VM {
                         }
                     },
 
-                    OpCode::Return => {
+                    OpCode::Print => {
                         if let Some(value) = self.stack.pop() {
                             println!("{}", value);
                         }
+                    },
+                    OpCode::Pop => {
+                        self.stack.pop();
+                    },
+
+                    OpCode::DefineGlobal => {
+                        if let Some(OpCode::Index(index)) = self.chunk.next() {
+                            let index = *index;
+                            if let SquatValue::String(variable_name) = self.chunk.read_constant(index) {
+                                if let Some(value) = self.stack.pop() {
+                                    self.globals.insert(variable_name.clone(), value);
+                                } else {
+                                    panic!("DefineGlobal OpCode expects a value to be on the stack");
+                                }
+                            } else {
+                                panic!("DefineGlobal OpCode expects an Index OpCode that points towards a string constant");
+                            }
+                        } else {
+                            panic!("DefineGlobal OpCode must be followed by Index");
+                        }
+                    },
+                    OpCode::GetGlobal => {
+                        if let Some(OpCode::Index(index)) = self.chunk.next() {
+                            let index = *index;
+                            if let SquatValue::String(variable_name) = self.chunk.read_constant(index) {
+                                if let Some(value) = self.globals.get(variable_name) {
+                                    self.stack.push(value.clone());
+                                } else {
+                                    self.runtime_error(&format!("Variable with name {} is not defined", variable_name));
+                                }
+                            } else {
+                                panic!("GetGlobal OpCode expects an Index OpCode that points towards a string constant");
+                            }
+                        } else {
+                            panic!("GetGlobal OpCode must be followed by Index");
+                        }
+                    },
+                    OpCode::SetGlobal => {
+                        if let Some(OpCode::Index(index)) = self.chunk.next() {
+                            let index = *index;
+                            if let SquatValue::String(variable_name) = self.chunk.read_constant(index) {
+                                if let Some(value) = self.stack.last() {
+                                    if self.globals.contains_key(variable_name) {
+                                        self.globals.insert(variable_name.clone(), value.clone());
+                                    } else {
+                                        self.runtime_error(&format!("Variable with name {} is not defined", variable_name));
+                                    }
+                                } else {
+                                    panic!("SetGlobal OpCode expects a value to be on the stack");
+                                }
+                            } else {
+                                panic!("SetGlobal OpCode expects an Index OpCode that points towards a string constant");
+                            }
+                        } else {
+                            panic!("SetGlobal OpCode must be followed by Index");
+                        }
+                    },
+
+                    OpCode::Return => {
                         return InterpretResult::InterpretOk;
                     },
                     _ => panic!("Unsupported Opcode {:?}", instruction)
