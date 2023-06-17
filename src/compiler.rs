@@ -465,7 +465,7 @@ mod test {
     #[test]
     fn concat() {
         let mut chunk = Chunk::new("Concat".to_owned());
-        let source = String::from("\"a\" ++ \"a\"");
+        let source = String::from("\"a\" ++ \"b\"");
         let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
         let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
         compiler.compile();

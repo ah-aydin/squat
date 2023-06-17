@@ -39,7 +39,7 @@ impl Default for SquatValue {
 #[derive(Debug)]
 pub struct ValueArray {
     name: String,
-    values: Vec<SquatValue>,
+    values: Vec<SquatValue>
 }
 
 impl ValueArray {
@@ -61,7 +61,14 @@ impl ValueArray {
         &self.values[index]
     }
 
-    pub fn write(&mut self, value: SquatValue) {
+    pub fn write(&mut self, value: SquatValue) -> usize {
+        // TODO consider storing the indicies in a hash map in the future if things get too slow
+        // It might be faster, for now with small programs, linear search should be faster then
+        // computing the hash
+        if let Some(index) = self.values.iter().position(|v| *v == value) {
+            return index;
+        }
         self.values.push(value);
+        self.values.len() - 1
     }
 }

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::value::{ValueArray, SquatValue};
 use crate::op_code::OpCode;
 
@@ -43,8 +45,7 @@ impl Chunk {
     }
 
     pub fn add_constant(&mut self, value: SquatValue) -> usize {
-        self.constants.write(value);
-        self.constants.count() - 1
+        self.constants.write(value)
     }
 
     pub fn read_constant(&self, index: usize) -> &SquatValue {
