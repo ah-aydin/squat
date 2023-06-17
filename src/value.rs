@@ -11,9 +11,9 @@ pub enum SquatValue {
 impl PartialOrd for SquatValue {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match (self, other) {
+            (SquatValue::Nil, SquatValue::Nil) => Some(std::cmp::Ordering::Equal),
             (SquatValue::Number(f1), SquatValue::Number(f2)) => f1.partial_cmp(f2),
             (SquatValue::String(s1), SquatValue::String(s2)) => s1.partial_cmp(s2),
-            (SquatValue::Nil, SquatValue::Nil) => Some(std::cmp::Ordering::Equal),
             _ => None
         }
     }
@@ -27,6 +27,12 @@ impl fmt::Display for SquatValue {
             SquatValue::Bool(value)     => write!(f, "{}", value),
             SquatValue::String(value)   => write!(f, "{}", value)
         }
+    }
+}
+
+impl Default for SquatValue {
+    fn default() -> Self {
+        SquatValue::Nil
     }
 }
 

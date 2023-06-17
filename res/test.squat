@@ -1,0 +1,4 @@
+var number1 = 10;
+var number2 = 100;
+number1 = 75 / 5;
+print number1 + number2;

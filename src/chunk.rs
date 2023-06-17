@@ -88,9 +88,8 @@ impl Chunk {
         if op_index == self.code.len() - 1 {
             panic!("{:?} must be followed by Index - {}", op_code, identifier)
         }
-        else if let OpCode::Index(index) = self.code[op_index + 1] {
-            let value: &SquatValue = self.constants.get(index);
-            debug!("{}: {:?} {:?} {:?}", identifier, op_code, &self.code[op_index + 1], value);
+        else if let OpCode::Index(_index) = self.code[op_index + 1] {
+            debug!("{}: {:?} {:?}", identifier, op_code, &self.code[op_index + 1]);
             op_index + 2
         } else {
             panic!("{:?} must be followed by Index - {}", op_code, identifier)

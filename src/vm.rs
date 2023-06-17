@@ -22,7 +22,8 @@ pub enum InterpretResult {
 
 pub struct VM {
     stack: Vec<SquatValue>,
-    globals: HashMap<String, SquatValue>,
+    globals: Vec<Option<SquatValue>>,
+    global_variable_indicies: HashMap<String, usize>,
     chunk: Chunk,
     had_error: bool
 }
@@ -31,14 +32,15 @@ impl VM {
     pub fn new() -> VM {
         VM {
             stack: Vec::with_capacity(INITIAL_STACK_SIZE),
-            globals: HashMap::new(),
+            globals: vec![None; INITIAL_STACK_SIZE],
+            global_variable_indicies: HashMap::new(),
             chunk: Chunk::new("Base".to_owned()),
             had_error: false
         }
     }
 
     pub fn interpret_source(&mut self, source: String) -> InterpretResult {
-        let mut compiler = Compiler::new(&source, &mut self.chunk);
+        let mut compiler = Compiler::new(&source, &mut self.chunk, &mut self.global_variable_indicies);
         let interpret_result = match compiler.compile() {
             CompileStatus::Success => self.interpret_chunk(),
             CompileStatus::Fail => InterpretResult::InterpretCompileError
@@ -56,6 +58,12 @@ impl VM {
             #[cfg(debug_assertions)]
             for value in self.stack.iter() {
                 debug!("[{:?}]", value);
+            }
+            #[cfg(debug_assertions)]
+            for (index, value) in self.globals.iter().enumerate() {
+                if let Some(value) = value {
+                    debug!("({}: {:?})", index, value);
+                }
             }
 
             #[cfg(debug_assertions)]
@@ -142,53 +150,42 @@ impl VM {
                     OpCode::DefineGlobal => {
                         if let Some(OpCode::Index(index)) = self.chunk.next() {
                             let index = *index;
-                            if let SquatValue::String(variable_name) = self.chunk.read_constant(index) {
-                                if let Some(value) = self.stack.pop() {
-                                    self.globals.insert(variable_name.clone(), value);
-                                } else {
-                                    panic!("DefineGlobal OpCode expects a value to be on the stack");
-                                }
+                            if let Some(value) = self.stack.pop() {
+                                self.globals.insert(index, Some(value));
                             } else {
-                                panic!("DefineGlobal OpCode expects an Index OpCode that points towards a string constant");
+                                panic!("DefineGlobal OpCode expects a value to be on the stack");
                             }
                         } else {
-                            panic!("DefineGlobal OpCode must be followed by Index");
+                            panic!("DefineGlobal OpCode must be followed by Index OpCode");
                         }
                     },
                     OpCode::GetGlobal => {
                         if let Some(OpCode::Index(index)) = self.chunk.next() {
                             let index = *index;
-                            if let SquatValue::String(variable_name) = self.chunk.read_constant(index) {
-                                if let Some(value) = self.globals.get(variable_name) {
-                                    self.stack.push(value.clone());
-                                } else {
-                                    self.runtime_error(&format!("Variable with name {} is not defined", variable_name));
-                                }
+                            if let Some(Some(value)) = self.globals.get(index) {
+                                self.stack.push(value.clone());
                             } else {
-                                panic!("GetGlobal OpCode expects an Index OpCode that points towards a string constant");
+                                self.runtime_error(&format!("Variable with index {} is not defined", index));
                             }
                         } else {
-                            panic!("GetGlobal OpCode must be followed by Index");
+                            panic!("GetGlobal OpCode must be followed by Index OpCode");
                         }
                     },
                     OpCode::SetGlobal => {
                         if let Some(OpCode::Index(index)) = self.chunk.next() {
                             let index = *index;
-                            if let SquatValue::String(variable_name) = self.chunk.read_constant(index) {
-                                if let Some(value) = self.stack.last() {
-                                    if self.globals.contains_key(variable_name) {
-                                        self.globals.insert(variable_name.clone(), value.clone());
-                                    } else {
-                                        self.runtime_error(&format!("Variable with name {} is not defined", variable_name));
-                                    }
+                            if let Some(value) = self.stack.last() {
+                                if let Some(Some(_value)) = self.globals.get(index) {
+                                    //self.globals_vec.insert(index, Some(value.clone()));
+                                    self.globals[index] = Some(value.clone());
                                 } else {
-                                    panic!("SetGlobal OpCode expects a value to be on the stack");
+                                    self.runtime_error(&format!("Variable with index {} is not defined", index));
                                 }
                             } else {
-                                panic!("SetGlobal OpCode expects an Index OpCode that points towards a string constant");
+                                panic!("SetGlobal OpCode expects a value to be on the stack");
                             }
                         } else {
-                            panic!("SetGlobal OpCode must be followed by Index");
+                            panic!("SetGlobal OpCode must be followed by Index OpCode");
                         }
                     },
 

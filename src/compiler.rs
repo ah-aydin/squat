@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use crate::chunk::Chunk;
 use crate::lexer::{Lexer, LexerError};
 use crate::op_code::OpCode;
 use crate::token::{TokenType, Token};
 use crate::value::SquatValue;
 
-use log::error;
+use log::{error, debug};
 
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 #[repr(u8)]
@@ -42,6 +44,7 @@ pub enum CompileStatus {
 pub struct Compiler<'a> {
     lexer: Lexer<'a>,
     chunk: &'a mut Chunk,
+    global_variable_indicies: &'a mut HashMap<String, usize>,
     previous_token: Option<Token>,
     current_token: Option<Token>,
     had_error: bool,
@@ -49,10 +52,15 @@ pub struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
-    pub fn new(source: &'a String, chunk: &'a mut Chunk) -> Compiler<'a> {
+    pub fn new(
+        source: &'a String,
+        chunk: &'a mut Chunk,
+        global_variable_indicies: &'a mut HashMap<String, usize>
+    ) -> Compiler<'a> {
         Compiler {
             lexer: Lexer::new(source),
             chunk,
+            global_variable_indicies,
             previous_token: None,
             current_token: None,
             had_error: false,
@@ -67,10 +75,10 @@ impl<'a> Compiler<'a> {
             self.declaration();
         }
 
-        //self.expression();
-        //self.consume(TokenType::Eof, "Expected end of expression");
-
         self.chunk.write(OpCode::Return, self.current_token.as_ref().unwrap().line);
+
+        #[cfg(debug_assertions)]
+        debug!("Global variable indicies {:?}", self.global_variable_indicies);
 
         if self.had_error {
             return CompileStatus::Fail;
@@ -97,7 +105,7 @@ impl<'a> Compiler<'a> {
 
     fn var_declaration(&mut self) {
         let line = self.previous_token.as_ref().unwrap().line;
-        let global = self.parse_variable("Expect variable name");
+        let index = self.parse_variable("Expect variable name");
 
         if self.check_current(TokenType::Equal) {
             self.expression();
@@ -107,7 +115,26 @@ impl<'a> Compiler<'a> {
 
         self.consume(TokenType::Semicolon, "Expect ';' after variable declaration.");
 
-        self.define_variable(global);
+        self.define_variable(index);
+    }
+
+    fn parse_variable(&mut self, error_msg: &str) -> usize {
+        self.consume(TokenType::Identifier, error_msg);
+
+        let var_name = self.previous_token.as_ref().unwrap().lexeme.clone();
+        if let Some(index) = self.global_variable_indicies.get(&var_name) {
+            return *index;
+        }
+
+        let index = self.global_variable_indicies.len();
+        self.global_variable_indicies.insert(var_name, self.global_variable_indicies.len());
+        index
+    }
+
+    fn define_variable(&mut self, index: usize) {
+        let line = self.previous_token.as_ref().unwrap().line;
+        self.chunk.write(OpCode::DefineGlobal, line);
+        self.chunk.write(OpCode::Index(index), line);
     }
 
     fn statement(&mut self) {
@@ -142,24 +169,12 @@ impl<'a> Compiler<'a> {
         self.advance();
         self.call_prefix(self.previous_token.as_ref().unwrap().token_type);
 
-        //let can_assign = self.get_precedence(self.previous_token.as_ref().unwrap().token_type) <= Precedence::Assignment;
-
         while precedence <= self.get_precedence(self.current_token.as_ref().unwrap().token_type) {
             self.advance();
             self.call_infix(self.previous_token.as_ref().unwrap().token_type);
         }
     }
 
-    fn parse_variable(&mut self, error_msg: &str) -> usize {
-        self.consume(TokenType::Identifier, error_msg);
-        self.chunk.add_constant(SquatValue::String(self.previous_token.as_ref().unwrap().lexeme.clone()))
-    }
-
-    fn define_variable(&mut self, global: usize) {
-        let line = self.previous_token.as_ref().unwrap().line;
-        self.chunk.write(OpCode::DefineGlobal, line);
-        self.chunk.write(OpCode::Index(global), line);
-    }
 
     fn binary(&mut self) {
         let operation_token = self.previous_token.as_ref().unwrap().clone();
@@ -240,7 +255,16 @@ impl<'a> Compiler<'a> {
     fn variable(&mut self) {
         let line = self.previous_token.as_ref().unwrap().line;
 
-        let arg = self.chunk.add_constant(SquatValue::String(self.previous_token.as_ref().unwrap().lexeme.clone()));
+        let arg: usize;
+
+        let var_name = self.previous_token.as_ref().unwrap().lexeme.clone();
+        if let Some(index) = self.global_variable_indicies.get(&var_name) {
+            arg = *index;
+        } else {
+            let index = self.global_variable_indicies.len();
+            self.global_variable_indicies.insert(var_name, self.global_variable_indicies.len());
+            arg = index;
+        }
 
         if self.check_current(TokenType::Equal) {
             self.expression();
@@ -388,7 +412,8 @@ mod test {
     fn op_false() {
         let mut chunk = Chunk::new("True".to_owned());
         let source = String::from("false");
-        let mut compiler = Compiler::new(&source, &mut chunk);
+        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
+        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
         compiler.compile();
         assert_eq!(chunk.next(), Some(&OpCode::False));
     }
@@ -397,7 +422,8 @@ mod test {
     fn op_true() {
         let mut chunk = Chunk::new("True".to_owned());
         let source = String::from("true");
-        let mut compiler = Compiler::new(&source, &mut chunk);
+        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
+        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
         compiler.compile();
         assert_eq!(chunk.next(), Some(&OpCode::True));
     }
@@ -406,7 +432,8 @@ mod test {
     fn add() {
         let mut chunk = Chunk::new("Addition".to_owned());
         let source = String::from("1 + 2");
-        let mut compiler = Compiler::new(&source, &mut chunk);
+        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
+        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
         compiler.compile();
         interpret_binary_op_code(&mut chunk, OpCode::Add);
     }
@@ -415,7 +442,8 @@ mod test {
     fn subract() {
         let mut chunk = Chunk::new("Subtraction".to_owned());
         let source = String::from("1 - 2");
-        let mut compiler = Compiler::new(&source, &mut chunk);
+        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
+        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
         compiler.compile();
         interpret_binary_op_code(&mut chunk, OpCode::Subtract);
     }
@@ -424,7 +452,8 @@ mod test {
     fn multiply() {
         let mut chunk = Chunk::new("Multiply".to_owned());
         let source = String::from("1 * 2");
-        let mut compiler = Compiler::new(&source, &mut chunk);
+        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
+        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
         compiler.compile();
         interpret_binary_op_code(&mut chunk, OpCode::Multiply);
     }
@@ -433,7 +462,8 @@ mod test {
     fn divide() {
         let mut chunk = Chunk::new("Divide".to_owned());
         let source = String::from("1 / 2");
-        let mut compiler = Compiler::new(&source, &mut chunk);
+        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
+        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
         compiler.compile();
         interpret_binary_op_code(&mut chunk, OpCode::Divide);
     }
@@ -442,7 +472,8 @@ mod test {
     fn concat() {
         let mut chunk = Chunk::new("Concat".to_owned());
         let source = String::from("\"a\" ++ \"a\"");
-        let mut compiler = Compiler::new(&source, &mut chunk);
+        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
+        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
         compiler.compile();
         interpret_binary_op_code(&mut chunk, OpCode::Concat);
     }
@@ -451,7 +482,8 @@ mod test {
     fn equal() {
         let mut chunk = Chunk::new("Equal".to_owned());
         let source = String::from("1 == 2");
-        let mut compiler = Compiler::new(&source, &mut chunk);
+        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
+        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
         compiler.compile();
         interpret_binary_op_code(&mut chunk, OpCode::Equal);
     }
@@ -460,7 +492,8 @@ mod test {
     fn not_equal() {
         let mut chunk = Chunk::new("Not Equal".to_owned());
         let source = String::from("1 != 2");
-        let mut compiler = Compiler::new(&source, &mut chunk);
+        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
+        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
         compiler.compile();
         interpret_binary_op_code(&mut chunk, OpCode::NotEqual);
     }
@@ -469,7 +502,8 @@ mod test {
     fn greater() {
         let mut chunk = Chunk::new("Greater".to_owned());
         let source = String::from("1 > 2");
-        let mut compiler = Compiler::new(&source, &mut chunk);
+        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
+        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
         compiler.compile();
         interpret_binary_op_code(&mut chunk, OpCode::Greater);
     }
@@ -478,7 +512,8 @@ mod test {
     fn greater_equal() {
         let mut chunk = Chunk::new("Greater Equal".to_owned());
         let source = String::from("1 >= 2");
-        let mut compiler = Compiler::new(&source, &mut chunk);
+        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
+        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
         compiler.compile();
         interpret_binary_op_code(&mut chunk, OpCode::GreaterEqual);
     }
@@ -487,7 +522,8 @@ mod test {
     fn less() {
         let mut chunk = Chunk::new("Less".to_owned());
         let source = String::from("1 < 2");
-        let mut compiler = Compiler::new(&source, &mut chunk);
+        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
+        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
         compiler.compile();
         interpret_binary_op_code(&mut chunk, OpCode::Less);
     }
@@ -496,7 +532,8 @@ mod test {
     fn less_equal() {
         let mut chunk = Chunk::new("Less Equal".to_owned());
         let source = String::from("1 <= 2");
-        let mut compiler = Compiler::new(&source, &mut chunk);
+        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
+        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
         compiler.compile();
         interpret_binary_op_code(&mut chunk, OpCode::LessEqual);
     }
@@ -505,7 +542,8 @@ mod test {
     fn not() {
         let mut chunk = Chunk::new("Less Equal".to_owned());
         let source = String::from("!1");
-        let mut compiler = Compiler::new(&source, &mut chunk);
+        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
+        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
         compiler.compile();
         assert_eq!(chunk.next(), Some(&OpCode::Constant));
         assert_eq!(chunk.next(), Some(&OpCode::Index(0)));
@@ -516,7 +554,8 @@ mod test {
     fn negate() {
         let mut chunk = Chunk::new("Less Equal".to_owned());
         let source = String::from("-1");
-        let mut compiler = Compiler::new(&source, &mut chunk);
+        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
+        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
         compiler.compile();
         assert_eq!(chunk.next(), Some(&OpCode::Constant));
         assert_eq!(chunk.next(), Some(&OpCode::Index(0)));
