@@ -150,14 +150,11 @@ impl<'a> Compiler<'a> {
                         break;
                     }
                 } else {
-                    let line = self.previous_token.as_ref().unwrap().line;
-                    self.compile_error(line, "Can't read local variable in its own initializer.");
+                    self.compile_error("Can't read local variable in its own initializer.");
                 }
 
                 if self.locals[i].name == name {
-                    let line = self.previous_token.as_ref().unwrap().line;
                     self.compile_error(
-                        line,
                         &format!(
                             "Variable with name '{}' allready exists in this scope (depth: {})",
                             name,
@@ -377,13 +374,13 @@ impl<'a> Compiler<'a> {
                 Err(err) => {
                     match err {
                         LexerError::UndefinedToken { line, lexeme }
-                            => self.compile_error(line, &format!("undefined token '{}'", lexeme)),
+                            => self.compile_error_token(line, &format!("undefined token '{}'", lexeme)),
                         LexerError::IncompleteComment { line }
-                            => self.compile_error(line, "incomplete comment"),
+                            => self.compile_error_token(line, "incomplete comment"),
                         LexerError::IncompleteString { line }
-                            => self.compile_error(line, "incomplete string"),
+                            => self.compile_error_token(line, "incomplete string"),
                         LexerError::InternalError { msg, line }
-                            => self.compile_error(line, &msg)
+                            => self.compile_error_token(line, &msg)
                     };
                 }
             }
@@ -396,9 +393,8 @@ impl<'a> Compiler<'a> {
                 self.advance();
                 return;
             }
-            let line = self.previous_token.as_ref().unwrap().line;
             let lexeme = &self.previous_token.as_ref().unwrap().lexeme;
-            self.compile_error(line, &format!("Error at '{}': {}", lexeme, message));
+            self.compile_error(&format!("Error at '{}': {}", lexeme, message));
             return;
         }
         panic!("Unreachable line");
@@ -409,9 +405,8 @@ impl<'a> Compiler<'a> {
             if token.token_type == expected_type {
                 return;
             }
-            let line = self.previous_token.as_ref().unwrap().line;
             let lexeme = &self.previous_token.as_ref().unwrap().lexeme;
-            self.compile_error(line, &format!("Error at '{}': {}", lexeme, message));
+            self.compile_error(&format!("Error at '{}': {}", lexeme, message));
             return;
         }
         panic!("Unreachable line");
@@ -505,7 +500,14 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    fn compile_error(&mut self, line: u32, message: &str) {
+    fn compile_error(&mut self, message: &str) {
+        let line = self.previous_token.as_ref().unwrap().line;
+        println!("[COMPILE ERROR] (Line {}) {}", line, message);
+        self.had_error = true;
+        self.panic_mode = true;
+    }
+
+    fn compile_error_token(&mut self, line: u32, message: &str) {
         println!("[COMPILE ERROR] (Line {}) {}", line, message);
         self.had_error = true;
         self.panic_mode = true;

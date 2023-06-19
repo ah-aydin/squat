@@ -5,8 +5,8 @@ print number1 + number2;
 
 {
     var string1 = "this is a local variable";
+    print 10 + 99;
     var number2 = number2 * 4;
-    print 999999999;
     print number2;
     print string1 ++ " this is string 1 added up";
     print 999999999;
