@@ -58,22 +58,22 @@ impl VM {
         self.chunk.reset();
 
         loop {
-            // #[cfg(debug_assertions)]
-            // {
-            //     debug!("STACK");
-            //     for value in self.stack.iter() {
-            //         debug!("[{:?}]", value);
-            //     }
-            // }
-            // #[cfg(debug_assertions)]
-            // {
-            //     debug!("GLOBALS");
-            //     for (index, value) in self.globals.iter().enumerate() {
-            //         if let Some(value) = value {
-            //             debug!("({}: {:?})", index, value);
-            //         }
-            //     }
-            // }
+            #[cfg(feature = "log_stack")]
+            {
+                debug!("STACK");
+                for value in self.stack.iter() {
+                    debug!("[{:?}]", value);
+                }
+            }
+            #[cfg(feature = "log_globals")]
+            {
+                debug!("GLOBALS");
+                for (index, value) in self.globals.iter().enumerate() {
+                    if let Some(value) = value {
+                        debug!("({}: {:?})", index, value);
+                    }
+                }
+            }
 
             #[cfg(debug_assertions)]
             self.chunk.disassemble_current_instruction();

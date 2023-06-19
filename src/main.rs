@@ -49,10 +49,10 @@ fn run_file(file: &String) {
     let result = vm.interpret_source(source);
 
     if result == InterpretResult::InterpretCompileError {
-        panic!("CompileError");
+        println!("CompileError");
     }
     if result == InterpretResult::InterpretRuntimeError {
-        panic!("RuntimeError");
+        println!("RuntimeError");
     }
 }
 
