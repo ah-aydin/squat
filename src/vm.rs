@@ -42,7 +42,10 @@ impl VM {
     pub fn interpret_source(&mut self, source: String) -> InterpretResult {
         let mut compiler = Compiler::new(&source, &mut self.chunk, &mut self.global_variable_indicies);
         let interpret_result = match compiler.compile() {
-            CompileStatus::Success => self.interpret_chunk(),
+            CompileStatus::Success => {
+                drop(compiler);
+                self.interpret_chunk()
+            },
             CompileStatus::Fail => InterpretResult::InterpretCompileError
         };
 
@@ -55,16 +58,22 @@ impl VM {
         self.chunk.reset();
 
         loop {
-            #[cfg(debug_assertions)]
-            for value in self.stack.iter() {
-                debug!("[{:?}]", value);
-            }
-            #[cfg(debug_assertions)]
-            for (index, value) in self.globals.iter().enumerate() {
-                if let Some(value) = value {
-                    debug!("({}: {:?})", index, value);
-                }
-            }
+            // #[cfg(debug_assertions)]
+            // {
+            //     debug!("STACK");
+            //     for value in self.stack.iter() {
+            //         debug!("[{:?}]", value);
+            //     }
+            // }
+            // #[cfg(debug_assertions)]
+            // {
+            //     debug!("GLOBALS");
+            //     for (index, value) in self.globals.iter().enumerate() {
+            //         if let Some(value) = value {
+            //             debug!("({}: {:?})", index, value);
+            //         }
+            //     }
+            // }
 
             #[cfg(debug_assertions)]
             self.chunk.disassemble_current_instruction();
@@ -178,13 +187,32 @@ impl VM {
                                 if let Some(Some(_value)) = self.globals.get(index) {
                                     self.globals[index] = Some(value.clone());
                                 } else {
-                                    self.runtime_error(&format!("Variable with index {} is not defined", index));
+                                    self.runtime_error(&format!("You cannot set a global variable before defining it"));
                                 }
                             } else {
                                 panic!("SetGlobal OpCode expects a value to be on the stack");
                             }
                         } else {
                             panic!("SetGlobal OpCode must be followed by Index OpCode");
+                        }
+                    },
+
+                    OpCode::GetLocal => {
+                        if let Some(OpCode::Index(index)) = self.chunk.next() {
+                            self.stack.push(self.stack[*index].clone());
+                        } else {
+                            panic!("GetLocal OpCode must be followed by Index OpCode");
+                        }
+                    },
+                    OpCode::SetLocal => {
+                        if let Some(OpCode::Index(index)) = self.chunk.next() {
+                            if let Some(value) = self.stack.last() {
+                                self.stack[*index] = value.clone();
+                            } else {
+                                panic!("SetLocal OpCode expects a value to be on the stack");
+                            }
+                        } else {
+                            panic!("SetLocal OpCode must be followed by Index OpCode");
                         }
                     },
 

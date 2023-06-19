@@ -9,6 +9,8 @@ use crate::value::SquatValue;
 #[cfg(debug_assertions)]
 use log::debug;
 
+const INITIAL_LOCALS_VECTOR_SIZE: usize = 256;
+
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 #[repr(u8)]
 enum Precedence {
@@ -42,12 +44,23 @@ pub enum CompileStatus {
     Fail
 }
 
+struct Local {
+    name: String,
+    // If this value is missing, the variable is not initialized yet.
+    depth: Option<u32>
+}
+
 pub struct Compiler<'a> {
     lexer: Lexer<'a>,
-    chunk: &'a mut Chunk,
-    global_variable_indicies: &'a mut HashMap<String, usize>,
     previous_token: Option<Token>,
     current_token: Option<Token>,
+
+    chunk: &'a mut Chunk,
+    global_variable_indicies: &'a mut HashMap<String, usize>,
+
+    locals: Vec<Local>,
+    scope_depth: u32,
+
     had_error: bool,
     panic_mode: bool
 }
@@ -60,10 +73,15 @@ impl<'a> Compiler<'a> {
     ) -> Compiler<'a> {
         Compiler {
             lexer: Lexer::new(source),
-            chunk,
-            global_variable_indicies,
             previous_token: None,
             current_token: None,
+            
+            chunk,
+            global_variable_indicies,
+
+            locals: Vec::with_capacity(INITIAL_LOCALS_VECTOR_SIZE),
+            scope_depth: 0,
+
             had_error: false,
             panic_mode: false
         }
@@ -81,8 +99,10 @@ impl<'a> Compiler<'a> {
         if self.had_error {
             return CompileStatus::Fail;
         }
+
         #[cfg(debug_assertions)]
         debug!("Global variable indicies {:?}", self.global_variable_indicies);
+
         CompileStatus::Success
     }
 
@@ -112,13 +132,45 @@ impl<'a> Compiler<'a> {
             self.chunk.write(OpCode::Nil, line);
         }
 
-        self.consume(TokenType::Semicolon, "Expect ';' after variable declaration.");
+        self.consume_current(TokenType::Semicolon, "Expect ';' after variable declaration.");
 
         self.define_variable(index);
     }
 
     fn parse_variable(&mut self, error_msg: &str) -> usize {
-        self.consume(TokenType::Identifier, error_msg);
+        self.consume_current(TokenType::Identifier, error_msg);
+
+        // Local variable
+        if self.scope_depth > 0 {
+            let name = self.previous_token.as_ref().unwrap().lexeme.clone();
+            
+            for i in (0..self.locals.len()).rev() {
+                if let Some(depth) = self.locals[i].depth {
+                    if depth < self.scope_depth {
+                        break;
+                    }
+                } else {
+                    let line = self.previous_token.as_ref().unwrap().line;
+                    self.compile_error(line, "Can't read local variable in its own initializer.");
+                }
+
+                if self.locals[i].name == name {
+                    let line = self.previous_token.as_ref().unwrap().line;
+                    self.compile_error(
+                        line,
+                        &format!(
+                            "Variable with name '{}' allready exists in this scope (depth: {})",
+                            name,
+                            &self.scope_depth
+                        )
+                    );
+                    return 0;
+                }
+            }
+            let local = Local { name, depth: None };
+            self.locals.push(local);
+            return 0;
+        }
 
         let var_name = self.previous_token.as_ref().unwrap().lexeme.clone();
         if let Some(index) = self.global_variable_indicies.get(&var_name) {
@@ -131,6 +183,12 @@ impl<'a> Compiler<'a> {
     }
 
     fn define_variable(&mut self, index: usize) {
+        // Local variable
+        if self.scope_depth > 0 {
+            self.locals.last_mut().unwrap().depth = Some(self.scope_depth);
+            return;
+        }
+
         let line = self.previous_token.as_ref().unwrap().line;
         self.chunk.write(OpCode::DefineGlobal, line);
         self.chunk.write(OpCode::Index(index), line);
@@ -139,6 +197,10 @@ impl<'a> Compiler<'a> {
     fn statement(&mut self) {
         if self.check_current(TokenType::Print) {
             self.print_statement()
+        } else if self.check_current(TokenType::LeftBrace) {
+            self.begin_scope();
+            self.block();
+            self.end_scope();
         } else {
             self.expression_statement();
         }
@@ -148,15 +210,23 @@ impl<'a> Compiler<'a> {
         let line = self.previous_token.as_ref().unwrap().line;
 
         self.expression();
-        self.consume(TokenType::Semicolon, "Expect ';' after value.");
+        self.consume_current(TokenType::Semicolon, "Expect ';' after value.");
         self.chunk.write(OpCode::Print, line);
+    }
+
+    fn block(&mut self) {
+        while !self.check_current(TokenType::RightBrace) && !self.check_current(TokenType::Eof) {
+            self.declaration();
+        }
+
+        self.consume_previous(TokenType::RightBrace, "Expect closing '}' to end the block");
     }
 
     fn expression_statement(&mut self) {
         let line = self.current_token.as_ref().unwrap().line;
 
         self.expression();
-        self.consume(TokenType::Semicolon, "Expect ';' after expression");
+        self.consume_current(TokenType::Semicolon, "Expect ';' after expression");
         self.chunk.write(OpCode::Pop, line);
     }
 
@@ -205,7 +275,7 @@ impl<'a> Compiler<'a> {
 
     fn grouping(&mut self) {
         self.expression();
-        self.consume(TokenType::RightParenthesis, "Expected closing ')'");
+        self.consume_current(TokenType::RightParenthesis, "Expected closing ')'");
     }
 
     fn literal(&mut self) {
@@ -255,22 +325,36 @@ impl<'a> Compiler<'a> {
         let line = self.previous_token.as_ref().unwrap().line;
 
         let arg: usize;
-
         let var_name = self.previous_token.as_ref().unwrap().lexeme.clone();
-        if let Some(index) = self.global_variable_indicies.get(&var_name) {
-            arg = *index;
+
+        let set_op_code: OpCode;
+        let get_op_code: OpCode;
+
+        if let Some(local_arg) = self.resolve_local(&var_name) {
+            arg = local_arg;
+
+            set_op_code = OpCode::SetLocal;
+            get_op_code = OpCode::GetLocal;
         } else {
-            let index = self.global_variable_indicies.len();
-            self.global_variable_indicies.insert(var_name, self.global_variable_indicies.len());
-            arg = index;
+            if let Some(index) = self.global_variable_indicies.get(&var_name) {
+                arg = *index;
+            } else {
+                let index = self.global_variable_indicies.len();
+                self.global_variable_indicies.insert(var_name, self.global_variable_indicies.len());
+                arg = index;
+            }
+
+            set_op_code = OpCode::SetGlobal;
+            get_op_code = OpCode::GetGlobal;
         }
+
 
         if self.check_current(TokenType::Equal) {
             self.expression();
-            self.chunk.write(OpCode::SetGlobal, line);
+            self.chunk.write(set_op_code, line);
             self.chunk.write(OpCode::Index(arg), line);
         } else {
-            self.chunk.write(OpCode::GetGlobal, line);
+            self.chunk.write(get_op_code, line);
             self.chunk.write(OpCode::Index(arg), line);
         }
     }
@@ -306,7 +390,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    fn consume(&mut self, expected_type: TokenType, message: &str) {
+    fn consume_current(&mut self, expected_type: TokenType, message: &str) {
         if let Some(token) = &self.current_token {
             if token.token_type == expected_type {
                 self.advance();
@@ -320,6 +404,19 @@ impl<'a> Compiler<'a> {
         panic!("Unreachable line");
     }
     
+    fn consume_previous(&mut self, expected_type: TokenType, message: &str) {
+        if let Some(token) = &self.previous_token {
+            if token.token_type == expected_type {
+                return;
+            }
+            let line = self.previous_token.as_ref().unwrap().line;
+            let lexeme = &self.previous_token.as_ref().unwrap().lexeme;
+            self.compile_error(line, &format!("Error at '{}': {}", lexeme, message));
+            return;
+        }
+        panic!("Unreachable line");
+    }
+
     fn check_current(&mut self, expected_type: TokenType) -> bool {
         if let Some(token) = &self.current_token {
             if token.token_type == expected_type {
@@ -347,6 +444,30 @@ impl<'a> Compiler<'a> {
             }
             self.advance();
         }
+    }
+
+    fn begin_scope(&mut self) {
+        self.scope_depth += 1;
+    }
+
+    fn end_scope(&mut self) {
+        self.scope_depth -= 1;
+
+        // Remove the local variables from the stack
+        while self.locals.len() > 0 && self.locals[self.locals.len() - 1].depth.unwrap() > self.scope_depth {
+            let line = self.previous_token.as_ref().unwrap().line;
+            self.chunk.write(OpCode::Pop, line);
+            self.locals.pop();
+        }
+    }
+
+    fn resolve_local(&mut self, name: &str) -> Option<usize> {
+        for i in (0..self.locals.len()).rev() {
+            if self.locals[i].name == name && self.locals[i].depth.is_some() {
+                return Some(i);
+            }
+        }
+        None
     }
 
     fn call_prefix(&mut self, token_type: TokenType) {

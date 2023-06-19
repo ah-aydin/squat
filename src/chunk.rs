@@ -78,7 +78,9 @@ impl Chunk {
         let identifier = format!("{:04} {:04}", op_index, self.get_line(op_index).unwrap());
 
         match op_code {
-            OpCode::Constant | OpCode::DefineGlobal | OpCode::GetGlobal | OpCode::SetGlobal 
+            OpCode::Constant |
+                OpCode::DefineGlobal | OpCode::GetGlobal | OpCode::SetGlobal |
+                OpCode::GetLocal | OpCode::SetLocal
                 => self.constant_instruction(op_code, op_index, &identifier),
             _ => {
                 debug!("{}: {:?}", identifier, op_code);
