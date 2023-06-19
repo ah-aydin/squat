@@ -78,12 +78,11 @@ impl<'a> Compiler<'a> {
 
         self.chunk.write(OpCode::Return, self.current_token.as_ref().unwrap().line);
 
-        #[cfg(debug_assertions)]
-        debug!("Global variable indicies {:?}", self.global_variable_indicies);
-
         if self.had_error {
             return CompileStatus::Fail;
         }
+        #[cfg(debug_assertions)]
+        debug!("Global variable indicies {:?}", self.global_variable_indicies);
         CompileStatus::Success
     }
 
@@ -99,7 +98,6 @@ impl<'a> Compiler<'a> {
         }
 
         if self.panic_mode {
-            self.panic_mode = false;
             self.synchronize();
         }
     }
@@ -335,12 +333,14 @@ impl<'a> Compiler<'a> {
     fn synchronize(&mut self) {
         self.panic_mode = false;
         while self.current_token.as_ref().unwrap().token_type != TokenType::Eof {
-            if self.previous_token.as_ref().unwrap().token_type == TokenType::Semicolon {
+            if self.current_token.as_ref().unwrap().token_type == TokenType::Semicolon {
+                self.advance();
                 break;
             }
             match self.current_token.as_ref().unwrap().token_type {
                 TokenType::Class | TokenType::Func | TokenType::Var | TokenType::For |
                     TokenType::If | TokenType::While | TokenType::Print | TokenType::Return => {
+                        self.advance();
                         break;
                     }
                 _ => {}
@@ -385,7 +385,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_error(&mut self, line: u32, message: &str) {
-        println!("[ERROR] (Line {}) {}", line, message);
+        println!("[COMPILE ERROR] (Line {}) {}", line, message);
         self.had_error = true;
         self.panic_mode = true;
     }
