@@ -111,7 +111,10 @@ impl<'a> Compiler<'a> {
     //////////////////////////////////////////////////////////////////////////
     
     fn declaration(&mut self) {
-        if self.check_current(TokenType::Var) {
+        if self.check_current(TokenType::Semicolon) {
+            self.compile_warning("Unnecessary ';'");
+        }
+        else if self.check_current(TokenType::Var) {
             self.var_declaration();
         } else {
             self.statement();
@@ -196,6 +199,8 @@ impl<'a> Compiler<'a> {
             self.if_statement();
         } else if self.check_current(TokenType::While) {
             self.while_statement();
+        } else if self.check_current(TokenType::For) {
+            self.for_statement();
         } else if self.check_current(TokenType::LeftBrace) {
             self.begin_scope();
             self.block();
@@ -245,12 +250,53 @@ impl<'a> Compiler<'a> {
         self.patch_jump(exit_jump);
         self.write_op_code(OpCode::Pop);
     }
+    
+    fn for_statement(&mut self) {
+        self.begin_scope();
+
+        self.consume_current(TokenType::LeftParenthesis, "Expected '(' after 'for'");
+        if self.check_current(TokenType::Var) {
+            self.var_declaration();
+        } else if !self.check_current(TokenType::Semicolon) {
+            self.expression_statement();
+        }
+
+        let mut loop_start = self.chunk.get_size();
+        let mut exit_jump: Option<usize> = None;
+        if !self.check_current(TokenType::Semicolon) {
+            self.expression();
+            self.consume_current(TokenType::Semicolon, "Expected ';' after loop condition");
+
+            exit_jump = Some(self.emit_jump(OpCode::JumpIfFalse));
+            self.write_op_code(OpCode::Pop);
+        }
+
+        if !self.check_current(TokenType::RightParenthesis) {
+            let body_jump = self.emit_jump(OpCode::Jump);
+            let increment_start = self.chunk.get_size();
+            self.expression();
+            self.write_op_code(OpCode::Pop);
+            self.consume_current(TokenType::RightParenthesis, "Expect closing ')'");
+            self.emit_loop(loop_start);
+            loop_start = increment_start;
+            self.patch_jump(body_jump);
+        }
+
+        self.statement();
+        self.emit_loop(loop_start);
+
+        if let Some(exit_jump) = exit_jump {
+            self.patch_jump(exit_jump);
+            self.write_op_code(OpCode::Pop);
+        }
+
+        self.end_scope();
+    }
 
     fn block(&mut self) {
         while !self.check_current(TokenType::RightBrace) && !self.check_current(TokenType::Eof) {
             self.declaration();
         }
-
         self.consume_previous(TokenType::RightBrace, "Expect closing '}' to end the block");
     }
 
@@ -587,7 +633,7 @@ impl<'a> Compiler<'a> {
     }
 
     //////////////////////////////////////////////////////////////////////////
-    /// Error reporting
+    /// Logging
     //////////////////////////////////////////////////////////////////////////
 
     fn compile_error(&mut self, message: &str) {
@@ -601,6 +647,11 @@ impl<'a> Compiler<'a> {
         println!("[COMPILE ERROR] (Line {}) {}", line, message);
         self.had_error = true;
         self.panic_mode = true;
+    }
+
+    fn compile_warning(&mut self, message: &str) {
+        let line = self.previous_token.as_ref().unwrap().line;
+        println!("[COMPILE WARNING] (Line {}) {}", line, message);
     }
 }
 
