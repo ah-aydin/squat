@@ -229,17 +229,6 @@ impl<'a> Compiler<'a> {
         self.patch_jump(else_jump);
     }
 
-    fn emit_jump(&mut self, op_code: OpCode) -> usize {
-        self.write_op_code(op_code, false);
-        self.write_op_code(OpCode::JumpOffset(120), false);
-        self.chunk.get_size() - 1
-    }
-
-    fn patch_jump(&mut self, op_location: usize) {
-        let jump = self.chunk.get_size() - op_location - 1;
-        self.chunk.set_jump_at(op_location, jump);
-    }
-
     fn block(&mut self) {
         while !self.check_current(TokenType::RightBrace) && !self.check_current(TokenType::Eof) {
             self.declaration();
@@ -268,6 +257,19 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    fn and(&mut self) {
+        let end_jump = self.emit_jump(OpCode::JumpIfFalse);
+        self.write_op_code(OpCode::Pop, false);
+        self.parse_precedence(Precedence::And);
+        self.patch_jump(end_jump);
+    }
+
+    fn or(&mut self) {
+        let end_jump = self.emit_jump(OpCode::JumpIfTrue);
+        self.write_op_code(OpCode::Pop, false);
+        self.parse_precedence(Precedence::Or);
+        self.patch_jump(end_jump);
+    }
 
     fn binary(&mut self) {
         let token_type = self.previous_token.as_ref().unwrap().clone().token_type;
@@ -463,6 +465,10 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    //////////////////////////////////////////////////////////////////////////
+    /// Scope functions
+    //////////////////////////////////////////////////////////////////////////
+
     fn begin_scope(&mut self) {
         self.scope_depth += 1;
     }
@@ -486,6 +492,10 @@ impl<'a> Compiler<'a> {
         None
     }
 
+    //////////////////////////////////////////////////////////////////////////
+    /// Token Linkers
+    //////////////////////////////////////////////////////////////////////////
+
     fn call_prefix(&mut self, token_type: TokenType) {
         match token_type {
             TokenType::LeftParenthesis => self.grouping(),
@@ -506,6 +516,8 @@ impl<'a> Compiler<'a> {
                 TokenType::BangEqual | TokenType::EqualEqual |
                 TokenType::Greater | TokenType::GreaterEqual |
                 TokenType::Less | TokenType::LessEqual => self.binary(),
+            TokenType::And => self.and(),
+            TokenType::Or => self.or(),
             _ => panic!("No infix is given for {:?}", token_type)
         }
     }
@@ -517,9 +529,30 @@ impl<'a> Compiler<'a> {
                 TokenType::BangEqual | TokenType::EqualEqual => Precedence::Equality,
             TokenType::Greater | TokenType::GreaterEqual |
                 TokenType::Less | TokenType::LessEqual => Precedence::Comparison,
+            TokenType::And => Precedence::And,
+            TokenType::Or => Precedence::Or,
             _ => Precedence::None
         }
     }
+
+    //////////////////////////////////////////////////////////////////////////
+    /// Jumps
+    //////////////////////////////////////////////////////////////////////////
+    
+    fn emit_jump(&mut self, op_code: OpCode) -> usize {
+        self.write_op_code(op_code, false);
+        self.write_op_code(OpCode::JumpOffset(120), false);
+        self.chunk.get_size() - 1
+    }
+
+    fn patch_jump(&mut self, op_location: usize) {
+        let jump = self.chunk.get_size() - op_location - 1;
+        self.chunk.set_jump_at(op_location, jump);
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    /// Write instruction
+    //////////////////////////////////////////////////////////////////////////
 
     fn write_op_code(&mut self, op_code: OpCode, current_token: bool) {
         let line;
@@ -530,6 +563,10 @@ impl<'a> Compiler<'a> {
         }
         self.chunk.write(op_code, line);
     }
+
+    //////////////////////////////////////////////////////////////////////////
+    /// Error reporting
+    //////////////////////////////////////////////////////////////////////////
 
     fn compile_error(&mut self, message: &str) {
         let line = self.previous_token.as_ref().unwrap().line;

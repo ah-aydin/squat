@@ -229,10 +229,10 @@ impl VM {
                                     self.chunk.current_instruction += offset.clone();
                                 }
                             } else {
-                                panic!("JumpIfElse OpCode expect a value to be on the stack");
+                                panic!("JumpIfFalse OpCode expect a value to be on the stack");
                             }
                         } else {
-                            panic!("JumpIfElse OpCode must be followed by JumpOffset OpCode");
+                            panic!("JumpIfFalse OpCode must be followed by JumpOffset OpCode");
                         }
                     },
                     OpCode::Jump => {
@@ -240,6 +240,19 @@ impl VM {
                             self.chunk.current_instruction += offset.clone();
                         } else {
                             panic!("Jump OpCode must be followd by JumpOffset OpCode");
+                        }
+                    },
+                    OpCode::JumpIfTrue => {
+                        if let Some(OpCode::JumpOffset(offset)) = self.chunk.next() {
+                            if let Some(value) = self.stack.last() {
+                                if is_truthy(value) {
+                                    self.chunk.current_instruction += offset.clone();
+                                }
+                            } else {
+                                panic!("JumpIfTrue OpCode expect a value to be on the stack");
+                            }
+                        } else {
+                            panic!("JumpIfTrue OpCode must be followed by JumpOffset OpCode");
                         }
                     }
 
