@@ -94,7 +94,7 @@ impl<'a> Compiler<'a> {
             self.declaration();
         }
 
-        self.write_op_code(OpCode::Return, true);
+        self.write_op_code_current(OpCode::Return);
 
         if self.had_error {
             return CompileStatus::Fail;
@@ -128,7 +128,7 @@ impl<'a> Compiler<'a> {
         if self.check_current(TokenType::Equal) {
             self.expression();
         } else {
-            self.write_op_code(OpCode::Nil, false);
+            self.write_op_code(OpCode::Nil);
         }
 
         self.consume_current(TokenType::Semicolon, "Expect ';' after variable declaration.");
@@ -185,8 +185,8 @@ impl<'a> Compiler<'a> {
             return;
         }
 
-        self.write_op_code(OpCode::DefineGlobal, false);
-        self.write_op_code(OpCode::Index(index), false);
+        self.write_op_code(OpCode::DefineGlobal);
+        self.write_op_code(OpCode::Index(index));
     }
 
     fn statement(&mut self) {
@@ -194,6 +194,8 @@ impl<'a> Compiler<'a> {
             self.print_statement()
         } else if self.check_current(TokenType::If) {
             self.if_statement();
+        } else if self.check_current(TokenType::While) {
+            self.while_statement();
         } else if self.check_current(TokenType::LeftBrace) {
             self.begin_scope();
             self.block();
@@ -206,7 +208,7 @@ impl<'a> Compiler<'a> {
     fn print_statement(&mut self) {
         self.expression();
         self.consume_current(TokenType::Semicolon, "Expect ';' after value.");
-        self.write_op_code(OpCode::Print, false);
+        self.write_op_code(OpCode::Print);
     }
 
     fn if_statement(&mut self) {
@@ -215,18 +217,33 @@ impl<'a> Compiler<'a> {
         self.consume_current(TokenType::RightParenthesis, "Expected closing ')'");
 
         let then_jump = self.emit_jump(OpCode::JumpIfFalse);
-        self.write_op_code(OpCode::Pop, false);
+        self.write_op_code(OpCode::Pop);
         self.statement();
 
         let else_jump = self.emit_jump(OpCode::Jump);
         self.patch_jump(then_jump);
-        self.write_op_code(OpCode::Pop, false);
+        self.write_op_code(OpCode::Pop);
 
         if self.check_current(TokenType::Else) {
             self.statement();
         }
 
         self.patch_jump(else_jump);
+    }
+
+    fn while_statement(&mut self) {
+        let loop_start = self.chunk.get_size();
+        self.consume_current(TokenType::LeftParenthesis, "Expected '(' after 'while'");
+        self.expression();
+        self.consume_current(TokenType::RightParenthesis, "Expected closing ')'");
+
+        let exit_jump = self.emit_jump(OpCode::JumpIfFalse);
+        self.write_op_code(OpCode::Pop);
+        self.statement();
+        self.emit_loop(loop_start);
+
+        self.patch_jump(exit_jump);
+        self.write_op_code(OpCode::Pop);
     }
 
     fn block(&mut self) {
@@ -240,7 +257,7 @@ impl<'a> Compiler<'a> {
     fn expression_statement(&mut self) {
         self.expression();
         self.consume_current(TokenType::Semicolon, "Expect ';' after expression");
-        self.write_op_code(OpCode::Pop, false)
+        self.write_op_code(OpCode::Pop)
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -259,14 +276,14 @@ impl<'a> Compiler<'a> {
 
     fn and(&mut self) {
         let end_jump = self.emit_jump(OpCode::JumpIfFalse);
-        self.write_op_code(OpCode::Pop, false);
+        self.write_op_code(OpCode::Pop);
         self.parse_precedence(Precedence::And);
         self.patch_jump(end_jump);
     }
 
     fn or(&mut self) {
         let end_jump = self.emit_jump(OpCode::JumpIfTrue);
-        self.write_op_code(OpCode::Pop, false);
+        self.write_op_code(OpCode::Pop);
         self.parse_precedence(Precedence::Or);
         self.patch_jump(end_jump);
     }
@@ -278,18 +295,18 @@ impl<'a> Compiler<'a> {
         self.parse_precedence(precedence + 1);
 
         match token_type {
-            TokenType::Plus =>          self.write_op_code(OpCode::Add, false),
-            TokenType::PlusPlus =>      self.write_op_code(OpCode::Concat, false),
-            TokenType::Minus =>         self.write_op_code(OpCode::Subtract, false),
-            TokenType::Star =>          self.write_op_code(OpCode::Multiply, false),
-            TokenType::Slash =>         self.write_op_code(OpCode::Divide, false),
+            TokenType::Plus =>          self.write_op_code(OpCode::Add),
+            TokenType::PlusPlus =>      self.write_op_code(OpCode::Concat),
+            TokenType::Minus =>         self.write_op_code(OpCode::Subtract),
+            TokenType::Star =>          self.write_op_code(OpCode::Multiply),
+            TokenType::Slash =>         self.write_op_code(OpCode::Divide),
 
-            TokenType::BangEqual =>     self.write_op_code(OpCode::NotEqual, false),
-            TokenType::EqualEqual =>    self.write_op_code(OpCode::Equal, false),
-            TokenType::Greater =>       self.write_op_code(OpCode::Greater, false),
-            TokenType::GreaterEqual =>  self.write_op_code(OpCode::GreaterEqual, false),
-            TokenType::Less =>          self.write_op_code(OpCode::Less, false),
-            TokenType::LessEqual =>     self.write_op_code(OpCode::LessEqual, false),
+            TokenType::BangEqual =>     self.write_op_code(OpCode::NotEqual),
+            TokenType::EqualEqual =>    self.write_op_code(OpCode::Equal),
+            TokenType::Greater =>       self.write_op_code(OpCode::Greater),
+            TokenType::GreaterEqual =>  self.write_op_code(OpCode::GreaterEqual),
+            TokenType::Less =>          self.write_op_code(OpCode::Less),
+            TokenType::LessEqual =>     self.write_op_code(OpCode::LessEqual),
 
             _ => panic!("Unreachable line")
         }
@@ -308,9 +325,9 @@ impl<'a> Compiler<'a> {
         let token_type = self.previous_token.as_ref().unwrap().token_type;
 
         match token_type {
-            TokenType::False => self.write_op_code(OpCode::False, false),
-            TokenType::Nil => self.write_op_code(OpCode::Nil, false),
-            TokenType::True => self.write_op_code(OpCode::True, false),
+            TokenType::False => self.write_op_code(OpCode::False),
+            TokenType::Nil => self.write_op_code(OpCode::Nil),
+            TokenType::True => self.write_op_code(OpCode::True),
             _ => panic!("Unreachable line")
         }
     }
@@ -320,16 +337,16 @@ impl<'a> Compiler<'a> {
         let line = self.previous_token.as_ref().unwrap().line;
 
         let index = self.chunk.add_constant(SquatValue::Number(value));
-        self.write_op_code(OpCode::Constant, false);
-        self.write_op_code(OpCode::Index(index), false);
+        self.write_op_code(OpCode::Constant);
+        self.write_op_code(OpCode::Index(index));
     }
 
     fn string(&mut self) {
         let value: String = self.previous_token.as_ref().unwrap().lexeme.clone();
 
         let index = self.chunk.add_constant(SquatValue::String(value));
-        self.write_op_code(OpCode::Constant, false);
-        self.write_op_code(OpCode::Index(index), false);
+        self.write_op_code(OpCode::Constant);
+        self.write_op_code(OpCode::Index(index));
     }
 
     fn unary(&mut self) {
@@ -338,8 +355,8 @@ impl<'a> Compiler<'a> {
         self.parse_precedence(Precedence::Unary);
 
         match token_type {
-            TokenType::Bang => self.write_op_code(OpCode::Not, false),
-            TokenType::Minus => self.write_op_code(OpCode::Negate, false),
+            TokenType::Bang => self.write_op_code(OpCode::Not),
+            TokenType::Minus => self.write_op_code(OpCode::Negate),
             _ => panic!("Unreachable line")
         }
     }
@@ -372,11 +389,11 @@ impl<'a> Compiler<'a> {
 
         if self.check_current(TokenType::Equal) {
             self.expression();
-            self.write_op_code(set_op_code, false);
-            self.write_op_code(OpCode::Index(arg), false);
+            self.write_op_code(set_op_code);
+            self.write_op_code(OpCode::Index(arg));
         } else {
-            self.write_op_code(get_op_code, false);
-            self.write_op_code(OpCode::Index(arg), false);
+            self.write_op_code(get_op_code);
+            self.write_op_code(OpCode::Index(arg));
         }
     }
 
@@ -478,7 +495,7 @@ impl<'a> Compiler<'a> {
 
         // Remove the local variables from the stack
         while self.locals.len() > 0 && self.locals[self.locals.len() - 1].depth.unwrap() > self.scope_depth {
-            self.write_op_code(OpCode::Pop, false);
+            self.write_op_code(OpCode::Pop);
             self.locals.pop();
         }
     }
@@ -540,8 +557,8 @@ impl<'a> Compiler<'a> {
     //////////////////////////////////////////////////////////////////////////
     
     fn emit_jump(&mut self, op_code: OpCode) -> usize {
-        self.write_op_code(op_code, false);
-        self.write_op_code(OpCode::JumpOffset(120), false);
+        self.write_op_code(op_code);
+        self.write_op_code(OpCode::JumpOffset(120));
         self.chunk.get_size() - 1
     }
 
@@ -550,18 +567,23 @@ impl<'a> Compiler<'a> {
         self.chunk.set_jump_at(op_location, jump);
     }
 
+    fn emit_loop(&mut self, loop_start: usize) {
+        self.write_op_code(OpCode::Loop);
+
+        let offset = self.chunk.get_size() - loop_start + 1;
+        self.write_op_code(OpCode::JumpOffset(offset));
+    }
+
     //////////////////////////////////////////////////////////////////////////
     /// Write instruction
     //////////////////////////////////////////////////////////////////////////
 
-    fn write_op_code(&mut self, op_code: OpCode, current_token: bool) {
-        let line;
-        if current_token {
-            line = self.current_token.as_ref().unwrap().line;
-        } else {
-            line = self.previous_token.as_ref().unwrap().line;
-        }
-        self.chunk.write(op_code, line);
+    fn write_op_code(&mut self, op_code: OpCode) {
+        self.chunk.write(op_code, self.previous_token.as_ref().unwrap().line);
+    }
+
+    fn write_op_code_current(&mut self, op_code: OpCode) {
+        self.chunk.write(op_code, self.current_token.as_ref().unwrap().line);
     }
 
     //////////////////////////////////////////////////////////////////////////

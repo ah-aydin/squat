@@ -17,6 +17,8 @@ print number2 * 3;
 
 if (1 == 1) {
     print "1 is 1";
+    var a = 1;
+    print a + 10;
     if (2 == 2) {
         print "2 is 2";
     }
@@ -58,4 +60,13 @@ if (1 == 1 or 2 == 1) {
 }
 if (1 != 1 or 2 != 2) {
     print "This is true 7";
+}
+
+var i = 0;
+while (i < 5) {
+    print i;
+    if (i == 2 or i == 3) {
+        print "I is 2 or 3";
+    }
+    i = i + 1;
 }

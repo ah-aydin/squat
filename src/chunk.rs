@@ -90,7 +90,7 @@ impl Chunk {
                         panic!("{:?} must be followed by Index - {}", op_code, identifier)
                     }
                 },
-            OpCode::Jump | OpCode::JumpIfFalse => { // These require JumpOffset OpCode follow up
+            OpCode::Jump | OpCode::JumpIfFalse | OpCode::JumpIfTrue | OpCode::Loop => { // These require JumpOffset OpCode follow up
                 if op_index == self.code.len() - 1 {
                     panic!("{:?} must be followed by JumpOffset - {}", op_code, identifier);
                 } else if let OpCode::JumpOffset(_offset) = self.code[op_index + 1] {

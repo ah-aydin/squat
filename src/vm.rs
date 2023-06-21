@@ -254,6 +254,13 @@ impl VM {
                         } else {
                             panic!("JumpIfTrue OpCode must be followed by JumpOffset OpCode");
                         }
+                    },
+                    OpCode::Loop => {
+                        if let Some(OpCode::JumpOffset(offset)) = self.chunk.next() {
+                            self.chunk.current_instruction -= offset.clone();
+                        } else {
+                            panic!("Loop OpCode must be followd by JumpOffset OpCode");
+                        }
                     }
 
                     OpCode::Return => {
