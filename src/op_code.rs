@@ -20,7 +20,7 @@ pub enum OpCode {
     DefineGlobal, GetGlobal, SetGlobal,
     GetLocal, SetLocal,
 
-    JumpIfFalse,
+    JumpOffset(usize), JumpIfFalse, Jump,
 
     Return
 }

@@ -44,6 +44,12 @@ impl VM {
         let interpret_result = match compiler.compile() {
             CompileStatus::Success => {
                 drop(compiler);
+                #[cfg(feature = "log_stack")]
+                {
+                    println!("---------------- INSTRUCTIONS ----------------");
+                    self.chunk.disassemble();
+                    println!("----------------------------------------------");
+                }
                 self.interpret_chunk()
             },
             CompileStatus::Fail => InterpretResult::InterpretCompileError
@@ -133,7 +139,7 @@ impl VM {
 
                     OpCode::Not => {
                         if let Some(value) = self.stack.pop() {
-                            self.stack.push(SquatValue::Bool(!is_falsey(&value)));
+                            self.stack.push(SquatValue::Bool(!is_truthy(&value)));
                         } else {
                             panic!("'!' cannot be used alone");
                         }
@@ -216,10 +222,31 @@ impl VM {
                         }
                     },
 
+                    OpCode::JumpIfFalse => {
+                        if let Some(OpCode::JumpOffset(offset)) = self.chunk.next() {
+                            if let Some(value) = self.stack.last() {
+                                if !is_truthy(value) {
+                                    self.chunk.current_instruction += offset.clone();
+                                }
+                            } else {
+                                panic!("JumpIfElse OpCode expect a value to be on the stack");
+                            }
+                        } else {
+                            panic!("JumpIfElse OpCode must be followed by JumpOffset OpCode");
+                        }
+                    },
+                    OpCode::Jump => {
+                        if let Some(OpCode::JumpOffset(offset)) = self.chunk.next() {
+                            self.chunk.current_instruction += offset.clone();
+                        } else {
+                            panic!("Jump OpCode must be followd by JumpOffset OpCode");
+                        }
+                    }
+
                     OpCode::Return => {
                         return InterpretResult::InterpretOk;
                     },
-                    _ => panic!("Unsupported Opcode {:?}", instruction)
+                    _ => panic!("Unsupported OpCode {:?}", instruction)
                 }
             } else {
                 break;
@@ -268,7 +295,7 @@ impl VM {
     }
 }
 
-fn is_falsey(value: &SquatValue) -> bool {
+fn is_truthy(value: &SquatValue) -> bool {
     match value {
         SquatValue::Bool(true) => true,
         SquatValue::Bool(false) | SquatValue::Nil => false,

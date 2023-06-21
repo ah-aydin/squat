@@ -214,13 +214,31 @@ impl<'a> Compiler<'a> {
         self.expression();
         self.consume_current(TokenType::RightParenthesis, "Expected closing ')'");
 
-        // let then_jump = self.emit_jump(OpCode::JumpIfFalse);
-        // self.statement();
-        // patch_jump(then_jump);
+        let then_jump = self.emit_jump(OpCode::JumpIfFalse);
+        self.write_op_code(OpCode::Pop, false);
+        self.statement();
+
+        let else_jump = self.emit_jump(OpCode::Jump);
+        self.patch_jump(then_jump);
+        self.write_op_code(OpCode::Pop, false);
+
+        if self.check_current(TokenType::Else) {
+            self.statement();
+        }
+
+        self.patch_jump(else_jump);
     }
 
-    // fn emit_jump(&mut self, instruction: OpCode) -> usize {
-    // }
+    fn emit_jump(&mut self, op_code: OpCode) -> usize {
+        self.write_op_code(op_code, false);
+        self.write_op_code(OpCode::JumpOffset(120), false);
+        self.chunk.get_size() - 1
+    }
+
+    fn patch_jump(&mut self, op_location: usize) {
+        let jump = self.chunk.get_size() - op_location - 1;
+        self.chunk.set_jump_at(op_location, jump);
+    }
 
     fn block(&mut self) {
         while !self.check_current(TokenType::RightBrace) && !self.check_current(TokenType::Eof) {

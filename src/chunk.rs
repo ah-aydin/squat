@@ -80,25 +80,30 @@ impl Chunk {
         match op_code {
             OpCode::Constant |
                 OpCode::DefineGlobal | OpCode::GetGlobal | OpCode::SetGlobal |
-                OpCode::GetLocal | OpCode::SetLocal
-                => self.constant_instruction(op_code, op_index, &identifier),
+                OpCode::GetLocal | OpCode::SetLocal => { // these require an Index OpCode follow up
+                    if op_index == self.code.len() - 1 {
+                        panic!("{:?} must be followed by Index - {}", op_code, identifier)
+                    } else if let OpCode::Index(_index) = self.code[op_index + 1] {
+                        debug!("{}: {:?} {:?}", identifier, op_code, &self.code[op_index + 1]);
+                        op_index + 2
+                    } else {
+                        panic!("{:?} must be followed by Index - {}", op_code, identifier)
+                    }
+                },
+            OpCode::Jump | OpCode::JumpIfFalse => { // These require JumpOffset OpCode follow up
+                if op_index == self.code.len() - 1 {
+                    panic!("{:?} must be followed by JumpOffset - {}", op_code, identifier);
+                } else if let OpCode::JumpOffset(_offset) = self.code[op_index + 1] {
+                    debug!("{}: {:?} {:?}", identifier, op_code, &self.code[op_index + 1]);
+                    op_index + 2
+                } else {
+                    panic!("{:?} must be followed by Index - {}", op_code, identifier)
+                }
+            }
             _ => {
                 debug!("{}: {:?}", identifier, op_code);
                 op_index + 1
             }
-        }
-    }
-
-    #[cfg(debug_assertions)]
-    fn constant_instruction(&self, op_code: &OpCode, op_index: usize, identifier: &String) -> usize {
-        if op_index == self.code.len() - 1 {
-            panic!("{:?} must be followed by Index - {}", op_code, identifier)
-        }
-        else if let OpCode::Index(_index) = self.code[op_index + 1] {
-            debug!("{}: {:?} {:?}", identifier, op_code, &self.code[op_index + 1]);
-            op_index + 2
-        } else {
-            panic!("{:?} must be followed by Index - {}", op_code, identifier)
         }
     }
 
@@ -116,8 +121,19 @@ impl Chunk {
         None
     }
 
+    pub fn set_jump_at(&mut self, location: usize, offset: usize) {
+        match self.code[location] {
+            OpCode::JumpOffset(_) => self.code[location] = OpCode::JumpOffset(offset),
+            _ => panic!("Trying to modify instruction {:?} into {:?}", self.code[location], OpCode::JumpOffset(offset))
+        };
+    }
+
     pub fn get_name(&self) -> String {
         self.name.clone()
+    }
+
+    pub fn get_size(&self) -> usize {
+        self.code.len()
     }
 
     pub fn next(&mut self) -> Option<&OpCode> {

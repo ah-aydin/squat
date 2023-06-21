@@ -1,4 +1,4 @@
-var number1 = 10;
+/*var number1 = 10;
 var number2 = 100;
 number1 = 75 / 5;
 print number1 + number2;
@@ -11,4 +11,29 @@ print number1 + number2;
     print string1 ++ " this is string 1 added up";
     print 999999999;
 }
+
 print number2 * 3;
+*/
+
+if (1 == 1) {
+    print "1 is 1";
+    if (2 == 2) {
+        print "2 is 2";
+    }
+    
+    if (3 >= 2) {
+        print "3 is bigger then 2";
+    }
+    print "Done the if in if number 2";
+    if (3 <= 2) {
+        print "3 is smaller then 2";
+    } else {
+        print "3 is not smaller then 2";
+    }
+}
+
+print "done this first if";
+
+if (1 == 2) {
+    print "1 is 2";
+}
