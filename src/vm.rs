@@ -33,7 +33,7 @@ impl VM {
     pub fn new() -> VM {
         VM {
             stack: Vec::with_capacity(INITIAL_STACK_SIZE),
-            globals: vec![None; INITIAL_STACK_SIZE],
+            globals: vec![None; 1],
             constants: ValueArray::new("Constants"),
             main_chunk: Chunk::new("Main"),
             global_var_decl_chunk: Chunk::new("Global Variable Decl"),
@@ -49,7 +49,7 @@ impl VM {
             &mut self.constants
         );
         let interpret_result = match compiler.compile() {
-            CompileStatus::Success(main_start) => {
+            CompileStatus::Success(main_start, global_count) => {
                 drop(compiler);
                 #[cfg(feature = "log_instructions")]
                 {
@@ -58,6 +58,7 @@ impl VM {
                     self.main_chunk.disassemble();
                     println!("----------------------------------------------");
                 }
+                self.globals = vec![None; global_count];
                 let starting_instruction = self.main_chunk.get_size();
                 while let Some(instruction) = self.global_var_decl_chunk.next() {
                     self.main_chunk.write(*instruction, self.global_var_decl_chunk.get_current_instruction_line());
@@ -179,7 +180,8 @@ impl VM {
                         if let Some(OpCode::Index(index)) = self.main_chunk.next() {
                             let index = *index;
                             if let Some(value) = self.stack.pop() {
-                                self.globals.insert(index, Some(value));
+                                //self.globals.insert(index, Some(value));
+                                self.globals[index] = Some(value);
                             } else {
                                 panic!("DefineGlobal OpCode expects a value to be on the stack");
                             }

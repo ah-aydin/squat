@@ -41,7 +41,7 @@ impl std::ops::Add<u8> for Precedence {
 
 pub enum CompileStatus {
     // Contains starting instruction
-    Success(usize),
+    Success(usize, usize), // main_start, global_variable_count
     Fail
 }
 
@@ -115,7 +115,7 @@ impl<'a> Compiler<'a> {
             self.declaration_global();
         }
 
-        let mut compile_status = CompileStatus::Success(self.main_start);
+        let mut compile_status = CompileStatus::Success(self.main_start, self.global_variable_indicies.len());
 
         if !self.found_main {
             compile_status = CompileStatus::Fail;
