@@ -22,7 +22,7 @@ pub enum OpCode {
 
     JumpTo(usize), JumpOffset(usize), JumpIfFalse, Jump, JumpIfTrue, JumpBack, Loop,
 
-    Return,
+    Call(usize), Return,
 
     Start, Stop
 }

@@ -20,24 +20,11 @@ pub enum InterpretResult {
 }
 
 struct CallFrame {
-    #[cfg(debug_assertions)]
-    name: String,
-
     stack_index: usize,
     return_address: usize
 }
 
 impl CallFrame {
-    #[cfg(debug_assertions)]
-    fn new(name: &str, stack_index: usize, return_address: usize) -> CallFrame {
-        CallFrame {
-            name: String::from(name),
-            stack_index,
-            return_address
-        }
-    }
-
-    #[cfg(not(debug_assertions))]
     fn new(stack_index: usize, return_address: usize) -> CallFrame {
         CallFrame {
             stack_index,
@@ -87,10 +74,6 @@ impl VM {
                     println!("----------------------------------------------");
                 }
                 self.globals = vec![None; global_count];
-
-                #[cfg(debug_assertions)]
-                self.call_stack.push(CallFrame::new("main", 0, 0));
-                #[cfg(not(debug_assertions))]
                 self.call_stack.push(CallFrame::new(0, 0));
 
                 // Add global initialization instruction to the end of the main_chunk
@@ -312,6 +295,13 @@ impl VM {
                             panic!("JumpIfTrue OpCode must be followed by JumpOffset OpCode");
                         }
                     },
+                    OpCode::JumpBack => {
+                        if let Some(call_frame) = self.call_stack.pop() {
+                            self.main_chunk.current_instruction = call_frame.return_address;
+                        } else {
+                            panic!("JumpBack OpCode must contain a CallFrame in call_stack");
+                        }
+                    },
                     OpCode::Loop => {
                         if let Some(OpCode::JumpOffset(offset)) = self.main_chunk.next() {
                             self.main_chunk.current_instruction -= offset.clone();
@@ -320,6 +310,12 @@ impl VM {
                         }
                     }
 
+                    OpCode::Call(func_instruction_index) => {
+                        let func_instruction_index = *func_instruction_index;
+                        let return_address = self.main_chunk.current_instruction + 1;
+                        self.call_stack.push(CallFrame::new(self.stack.len(), return_address));
+                        self.main_chunk.current_instruction = func_instruction_index;
+                    }
                     OpCode::Return => {
                     },
 

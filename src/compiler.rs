@@ -67,6 +67,8 @@ pub struct Compiler<'a> {
 
     global_variable_indicies: HashMap<String, usize>,
     constants: &'a mut ValueArray,
+    functions: HashMap<String, (usize, usize)>, // (key, value) => (func_name, (start_index, arity))
+    called_function: Option<String>,
 
     locals: Vec<Local>,
     scope_depth: u32,
@@ -96,6 +98,8 @@ impl<'a> Compiler<'a> {
 
             global_variable_indicies: HashMap::new(),
             constants,
+            functions: HashMap::new(),
+            called_function: None,
 
             locals: Vec::with_capacity(INITIAL_LOCALS_VECTOR_SIZE),
             scope_depth: 0,
@@ -119,7 +123,7 @@ impl<'a> Compiler<'a> {
 
         if !self.found_main {
             compile_status = CompileStatus::Fail;
-            self.compile_error("Did not define a main function");
+            println!("[COMPILE ERROR] Did not define the main function");
         }
         if self.had_error {
             compile_status = CompileStatus::Fail;
@@ -127,6 +131,8 @@ impl<'a> Compiler<'a> {
 
         #[cfg(debug_assertions)]
         debug!("Global variable indicies {:?}", self.global_variable_indicies);
+        #[cfg(debug_assertions)]
+        debug!("Functions {:?}", self.functions);
 
         compile_status
     }
@@ -171,23 +177,56 @@ impl<'a> Compiler<'a> {
         self.consume_current(TokenType::Identifier, "Expected an identifier after 'func'");
         let func_name = self.previous_token.as_ref().unwrap().lexeme.clone();
 
-        self.consume_current(TokenType::LeftParenthesis, "");
+        self.consume_current(TokenType::LeftParenthesis, "Expect '(' after function name.");
         if func_name == "main" {
             if self.found_main {
                 self.compile_error("Cannot have more then 1 main function");
             }
+            self.begin_scope();
+
             self.found_main = true;
-            self.consume_current(TokenType::RightParenthesis, "");
+            self.consume_current(TokenType::RightParenthesis, "Expect closing ')'. Function 'main' does not take arguments."); 
             self.consume_current(TokenType::LeftBrace, "Expected '{' to define function body");
+
             self.write_op_code(OpCode::Start);
             self.main_start = self.main_chunk.get_size();
-            self.begin_scope();
+
             self.block();
-            self.end_scope();
             self.write_op_code(OpCode::Stop);
 
+            self.end_scope();
         } else {
-            panic!("Code for handling non-main functions is not present");
+            if self.functions.contains_key(&func_name) { // TODO consider adding function
+                                                         // overloading
+                self.compile_error(&format!("Function '{}' is already defined.", func_name));
+            }
+            self.begin_scope();
+
+            let mut arity = 0;
+            if !self.check_current(TokenType::RightParenthesis) {
+                arity += 1;
+                let constant = self.parse_variable("Expect parameter name").unwrap();
+                self.define_variable(constant);
+
+                while self.check_current(TokenType::Comma) {
+                    arity += 1;
+                    if arity > 255 {
+                        self.compile_error("Can't have more then 255 parameters on a function");
+                    }
+                    let constant = self.parse_variable("Expect parameter name").unwrap();
+                    self.define_variable(constant);
+                }
+                self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
+            }
+
+            self.consume_current(TokenType::LeftBrace, "Expected '{' to define function body");
+
+            self.write_op_code(OpCode::Start);
+            self.functions.insert(func_name, (self.main_chunk.get_size() - 1, arity));
+            
+            self.block();
+            self.end_scope();
+            self.write_op_code(OpCode::JumpBack);
         }
     }
 
@@ -442,6 +481,18 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    fn call(&mut self) {
+        println!("function name {:?}", self.called_function);
+        if let Some(func_name) = &self.called_function {
+            if let Some((jump_index, _arity)) = self.functions.get(func_name) {
+                self.write_op_code(OpCode::Call(*jump_index));
+                self.consume_current(TokenType::RightParenthesis, "Expec closing ')'");
+            }
+        } else {
+            panic!("There is no function name here.");
+        }
+    }
+
     fn expression(&mut self) {
         self.parse_precedence(Precedence::Assignment);
     }
@@ -497,6 +548,11 @@ impl<'a> Compiler<'a> {
         let set_op_code: OpCode;
         let get_op_code: OpCode;
 
+        if self.functions.contains_key(&var_name) {
+            self.called_function = Some(var_name);
+            return;
+        }
+
         if let Some(local_arg) = self.resolve_local(&var_name) {
             arg = local_arg;
 
@@ -506,11 +562,8 @@ impl<'a> Compiler<'a> {
             if let Some(index) = self.global_variable_indicies.get(&var_name) {
                 arg = *index;
             } else {
-                self.compile_error(&format!("Variable with name {} is not defined.", var_name));
+                self.compile_error(&format!("{} is not defined.", var_name));
                 return;
-                // let index = self.global_variable_indicies.len();
-                // self.global_variable_indicies.insert(var_name, self.global_variable_indicies.len());
-                // arg = index;
             }
 
             set_op_code = OpCode::SetGlobal;
@@ -653,6 +706,7 @@ impl<'a> Compiler<'a> {
                 TokenType::Less | TokenType::LessEqual => self.binary(),
             TokenType::And => self.and(),
             TokenType::Or => self.or(),
+            TokenType::LeftParenthesis => self.call(),
             _ => panic!("No infix is given for {:?}", token_type)
         }
     }
@@ -666,6 +720,7 @@ impl<'a> Compiler<'a> {
                 TokenType::Less | TokenType::LessEqual => Precedence::Comparison,
             TokenType::And => Precedence::And,
             TokenType::Or => Precedence::Or,
+            TokenType::LeftParenthesis => Precedence::Call,
             _ => Precedence::None
         }
     }
