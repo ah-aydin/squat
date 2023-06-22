@@ -74,7 +74,7 @@ pub struct Compiler<'a> {
     had_error: bool,
     panic_mode: bool,
 
-    starting_instruction: usize,
+    main_start: usize,
     found_main: bool,
 }
 
@@ -104,7 +104,7 @@ impl<'a> Compiler<'a> {
             had_error: false,
             panic_mode: false,
 
-            starting_instruction: 0,
+            main_start: 0,
             found_main: false
         }
     }
@@ -116,7 +116,7 @@ impl<'a> Compiler<'a> {
             self.declaration_global();
         }
 
-        let mut compile_status = CompileStatus::Success(self.starting_instruction);
+        let mut compile_status = CompileStatus::Success(self.main_start);
 
         if !self.found_main {
             compile_status = CompileStatus::Fail;
@@ -181,7 +181,7 @@ impl<'a> Compiler<'a> {
             self.consume_current(TokenType::RightParenthesis, "");
             self.consume_current(TokenType::LeftBrace, "Expected '{' to define function body");
             self.write_op_code(OpCode::Start);
-            self.starting_instruction = self.main_chunk.get_size();
+            self.main_start = self.main_chunk.get_size();
             self.begin_scope();
             self.block();
             self.end_scope();
