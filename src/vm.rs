@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     chunk::Chunk,
     op_code::OpCode,
@@ -12,6 +10,7 @@ use crate::{
 use log::debug;
 
 const INITIAL_STACK_SIZE: usize = 256;
+const INITIAL_CALL_STACK_SIZE: usize = 256;
 
 #[derive(PartialEq)]
 pub enum InterpretResult {
@@ -20,8 +19,36 @@ pub enum InterpretResult {
     InterpretRuntimeError
 }
 
+struct CallFrame {
+    #[cfg(debug_assertions)]
+    name: String,
+
+    stack_index: usize,
+    return_address: usize
+}
+
+impl CallFrame {
+    #[cfg(debug_assertions)]
+    fn new(name: &str, stack_index: usize, return_address: usize) -> CallFrame {
+        CallFrame {
+            name: String::from(name),
+            stack_index,
+            return_address
+        }
+    }
+
+    #[cfg(not(debug_assertions))]
+    fn new(stack_index: usize, return_address: usize) -> CallFrame {
+        CallFrame {
+            stack_index,
+            return_address
+        }
+    }
+}
+
 pub struct VM {
     stack: Vec<SquatValue>,
+    call_stack: Vec<CallFrame>,
     globals: Vec<Option<SquatValue>>,
     constants: ValueArray,
     main_chunk: Chunk,
@@ -33,6 +60,7 @@ impl VM {
     pub fn new() -> VM {
         VM {
             stack: Vec::with_capacity(INITIAL_STACK_SIZE),
+            call_stack: Vec::with_capacity(INITIAL_CALL_STACK_SIZE),
             globals: vec![None; 1],
             constants: ValueArray::new("Constants"),
             main_chunk: Chunk::new("Main"),
@@ -59,11 +87,20 @@ impl VM {
                     println!("----------------------------------------------");
                 }
                 self.globals = vec![None; global_count];
+
+                #[cfg(debug_assertions)]
+                self.call_stack.push(CallFrame::new("main", 0, 0));
+                #[cfg(not(debug_assertions))]
+                self.call_stack.push(CallFrame::new(0, 0));
+
+                // Add global initialization instruction to the end of the main_chunk
+                // and execute them first, before jumping into main()
                 let starting_instruction = self.main_chunk.get_size();
                 while let Some(instruction) = self.global_var_decl_chunk.next() {
                     self.main_chunk.write(*instruction, self.global_var_decl_chunk.get_current_instruction_line());
                 }
                 self.main_chunk.write(OpCode::JumpTo(main_start), 0);
+
                 self.interpret_chunk(starting_instruction)
             },
             CompileStatus::Fail => InterpretResult::InterpretCompileError
@@ -220,7 +257,8 @@ impl VM {
 
                     OpCode::GetLocal => {
                         if let Some(OpCode::Index(index)) = self.main_chunk.next() {
-                            self.stack.push(self.stack[*index].clone());
+                            let index = index + self.call_stack.last().unwrap().stack_index;
+                            self.stack.push(self.stack[index].clone());
                         } else {
                             panic!("GetLocal OpCode must be followed by Index OpCode");
                         }
@@ -228,7 +266,8 @@ impl VM {
                     OpCode::SetLocal => {
                         if let Some(OpCode::Index(index)) = self.main_chunk.next() {
                             if let Some(value) = self.stack.last() {
-                                self.stack[*index] = value.clone();
+                                let index = index + self.call_stack.last().unwrap().stack_index;
+                                self.stack[index] = value.clone();
                             } else {
                                 panic!("SetLocal OpCode expects a value to be on the stack");
                             }
