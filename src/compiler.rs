@@ -4,7 +4,7 @@ use crate::chunk::Chunk;
 use crate::lexer::{Lexer, LexerError};
 use crate::op_code::OpCode;
 use crate::token::{TokenType, Token};
-use crate::value::SquatValue;
+use crate::value::{SquatValue, ValueArray};
 
 #[cfg(debug_assertions)]
 use log::debug;
@@ -40,7 +40,8 @@ impl std::ops::Add<u8> for Precedence {
 }
 
 pub enum CompileStatus {
-    Success,
+    // Contains starting instruction
+    Success(usize),
     Fail
 }
 
@@ -57,19 +58,24 @@ pub struct Compiler<'a> {
 
     chunk: &'a mut Chunk,
     global_variable_indicies: &'a mut HashMap<String, usize>,
+    constants: &'a mut ValueArray,
 
     locals: Vec<Local>,
     scope_depth: u32,
 
     had_error: bool,
-    panic_mode: bool
+    panic_mode: bool,
+
+    starting_instruction: usize,
+    found_main: bool,
 }
 
 impl<'a> Compiler<'a> {
     pub fn new(
         source: &'a String,
         chunk: &'a mut Chunk,
-        global_variable_indicies: &'a mut HashMap<String, usize>
+        global_variable_indicies: &'a mut HashMap<String, usize>,
+        constants: &'a mut ValueArray
     ) -> Compiler<'a> {
         Compiler {
             lexer: Lexer::new(source),
@@ -78,12 +84,16 @@ impl<'a> Compiler<'a> {
             
             chunk,
             global_variable_indicies,
+            constants,
 
             locals: Vec::with_capacity(INITIAL_LOCALS_VECTOR_SIZE),
             scope_depth: 0,
 
             had_error: false,
-            panic_mode: false
+            panic_mode: false,
+
+            starting_instruction: 0,
+            found_main: false
         }
     }
 
@@ -91,30 +101,52 @@ impl<'a> Compiler<'a> {
         self.advance();
 
         while !self.check_current(TokenType::Eof) {
-            self.declaration();
+            self.declaration_global();
         }
 
-        self.write_op_code_current(OpCode::Return);
+        let mut compile_status = CompileStatus::Success(self.starting_instruction);
 
+        if !self.found_main {
+            compile_status = CompileStatus::Fail;
+            self.compile_error("Did not define a main function");
+        }
         if self.had_error {
-            return CompileStatus::Fail;
+            compile_status = CompileStatus::Fail;
         }
 
         #[cfg(debug_assertions)]
         debug!("Global variable indicies {:?}", self.global_variable_indicies);
 
-        CompileStatus::Success
+        compile_status
     }
 
     //////////////////////////////////////////////////////////////////////////
     /// Statement rules
     //////////////////////////////////////////////////////////////////////////
     
-    fn declaration(&mut self) {
+    fn declaration_global(&mut self) {
         if self.check_current(TokenType::Semicolon) {
             self.compile_warning("Unnecessary ';'");
+        } else if self.check_current(TokenType::Func) {
+            self.function_declaration();
+        } else if self.check_current(TokenType::Var) {
+            panic!("I screwed up the global variable declarations with the main func implementation");
+            self.var_declaration();
+        } else {
+            self.compile_error("Statements are not allowed outside of function blocks");
         }
-        else if self.check_current(TokenType::Var) {
+
+        if self.panic_mode {
+            self.synchronize();
+        }
+    }
+
+    fn declaration_function(&mut self) {
+        if self.check_current(TokenType::Semicolon) {
+            self.compile_warning("Unnecessary ';'");
+        } else if self.check_current(TokenType::Func) {
+            self.compile_error("You cannot define a function inside another function");
+        } else if self.check_current(TokenType::Var) {
             self.var_declaration();
         } else {
             self.statement();
@@ -122,6 +154,30 @@ impl<'a> Compiler<'a> {
 
         if self.panic_mode {
             self.synchronize();
+        }
+    }
+
+    fn function_declaration(&mut self) {
+        self.consume_current(TokenType::Identifier, "Expected an identifier after 'func'");
+        let func_name = self.previous_token.as_ref().unwrap().lexeme.clone();
+
+        self.consume_current(TokenType::LeftParenthesis, "");
+        if func_name == "main" {
+            if self.found_main {
+                self.compile_error("Cannot have more then 1 main function");
+            }
+            self.found_main = true;
+            self.consume_current(TokenType::RightParenthesis, "");
+            self.consume_current(TokenType::LeftBrace, "Expected '{' to define function body");
+            self.write_op_code(OpCode::Start);
+            self.starting_instruction = self.chunk.get_size();
+            self.begin_scope();
+            self.block();
+            self.end_scope();
+            self.write_op_code(OpCode::Stop);
+
+        } else {
+            panic!("Code for handling non-main functions is not present");
         }
     }
 
@@ -294,10 +350,13 @@ impl<'a> Compiler<'a> {
     }
 
     fn block(&mut self) {
-        while !self.check_current(TokenType::RightBrace) && !self.check_current(TokenType::Eof) {
-            self.declaration();
+        while !self.check_current(TokenType::RightBrace) {
+            if self.check_current(TokenType::Eof) {
+                self.compile_error("Expected closing '}' to end the block");
+                break;
+            }
+            self.declaration_function();
         }
-        self.consume_previous(TokenType::RightBrace, "Expect closing '}' to end the block");
     }
 
     fn expression_statement(&mut self) {
@@ -380,9 +439,8 @@ impl<'a> Compiler<'a> {
 
     fn number(&mut self) {
         let value: f64 = self.previous_token.as_ref().unwrap().lexeme.parse().unwrap();
-        let line = self.previous_token.as_ref().unwrap().line;
 
-        let index = self.chunk.add_constant(SquatValue::Number(value));
+        let index = self.constants.write(SquatValue::Number(value));
         self.write_op_code(OpCode::Constant);
         self.write_op_code(OpCode::Index(index));
     }
@@ -390,7 +448,7 @@ impl<'a> Compiler<'a> {
     fn string(&mut self) {
         let value: String = self.previous_token.as_ref().unwrap().lexeme.clone();
 
-        let index = self.chunk.add_constant(SquatValue::String(value));
+        let index = self.constants.write(SquatValue::String(value));
         self.write_op_code(OpCode::Constant);
         self.write_op_code(OpCode::Index(index));
     }
@@ -626,10 +684,6 @@ impl<'a> Compiler<'a> {
 
     fn write_op_code(&mut self, op_code: OpCode) {
         self.chunk.write(op_code, self.previous_token.as_ref().unwrap().line);
-    }
-
-    fn write_op_code_current(&mut self, op_code: OpCode) {
-        self.chunk.write(op_code, self.current_token.as_ref().unwrap().line);
     }
 
     //////////////////////////////////////////////////////////////////////////

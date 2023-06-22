@@ -6,7 +6,7 @@ use crate::{
     compiler::{
         Compiler,
         CompileStatus
-    }, value::SquatValue
+    }, value::{SquatValue, ValueArray}
 };
 
 use log::debug;
@@ -24,6 +24,7 @@ pub struct VM {
     stack: Vec<SquatValue>,
     globals: Vec<Option<SquatValue>>,
     global_variable_indicies: HashMap<String, usize>,
+    constants: ValueArray,
     chunk: Chunk,
     had_error: bool
 }
@@ -34,15 +35,21 @@ impl VM {
             stack: Vec::with_capacity(INITIAL_STACK_SIZE),
             globals: vec![None; INITIAL_STACK_SIZE],
             global_variable_indicies: HashMap::new(),
+            constants: ValueArray::new("Constants"),
             chunk: Chunk::new("Main".to_owned()),
             had_error: false
         }
     }
 
     pub fn interpret_source(&mut self, source: String) -> InterpretResult {
-        let mut compiler = Compiler::new(&source, &mut self.chunk, &mut self.global_variable_indicies);
+        let mut compiler = Compiler::new(
+            &source,
+            &mut self.chunk,
+            &mut self.global_variable_indicies,
+            &mut self.constants
+        );
         let interpret_result = match compiler.compile() {
-            CompileStatus::Success => {
+            CompileStatus::Success(starting_instruction) => {
                 drop(compiler);
                 #[cfg(feature = "log_stack")]
                 {
@@ -50,7 +57,7 @@ impl VM {
                     self.chunk.disassemble();
                     println!("----------------------------------------------");
                 }
-                self.interpret_chunk()
+                self.interpret_chunk(starting_instruction)
             },
             CompileStatus::Fail => InterpretResult::InterpretCompileError
         };
@@ -59,9 +66,10 @@ impl VM {
         interpret_result
     }
 
-    fn interpret_chunk(&mut self) -> InterpretResult {
+    fn interpret_chunk(&mut self, starting_instruction: usize) -> InterpretResult {
         debug!("==== Interpret Chunk {} ====", self.chunk.get_name());
         self.chunk.reset();
+        self.chunk.current_instruction = starting_instruction;
 
         loop {
             #[cfg(feature = "log_stack")]
@@ -93,7 +101,8 @@ impl VM {
                     OpCode::Constant => {
                         if let Some(OpCode::Index(index)) = self.chunk.next() {
                             let index = *index;
-                            let constant: &SquatValue = self.chunk.read_constant(index);
+                            //let constant: &SquatValue = self.chunk.read_constant(index);
+                            let constant: &SquatValue = self.constants.get(index);
                             self.stack.push(constant.clone()); // TODO figure out a way to get rid
                                                                // of clone here
                         } else {
@@ -264,8 +273,13 @@ impl VM {
                     }
 
                     OpCode::Return => {
-                        return InterpretResult::InterpretOk;
                     },
+
+                    OpCode::Start => {},
+                    OpCode::Stop => {
+                        return InterpretResult::InterpretOk;
+                    }
+
                     _ => panic!("Unsupported OpCode {:?}", instruction)
                 }
             } else {

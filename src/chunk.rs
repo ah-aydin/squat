@@ -28,8 +28,7 @@ pub struct Chunk {
     name: String,
     code: Vec<OpCode>,
     pub current_instruction: usize,
-    lines: Vec<Line>,
-    constants: ValueArray
+    lines: Vec<Line>
 }
 
 impl Chunk {
@@ -38,17 +37,8 @@ impl Chunk {
             name: String::from(&name) + " chunk",
             code: Vec::new(),
             current_instruction: 0,
-            lines: Vec::new(),
-            constants: ValueArray::new(name + " constants")
+            lines: Vec::new()
         }
-    }
-
-    pub fn add_constant(&mut self, value: SquatValue) -> usize {
-        self.constants.write(value)
-    }
-
-    pub fn read_constant(&self, index: usize) -> &SquatValue {
-        self.constants.get(index)
     }
 
     #[cfg(debug_assertions)]
@@ -75,7 +65,7 @@ impl Chunk {
     #[cfg(debug_assertions)]
     fn disassemble_instruction(&self, op_code: &OpCode, op_index: usize) -> usize  {
         // If this lines panics, there is something wrong with the implementation
-        let identifier = format!("{:04} {:04}", op_index, self.get_line(op_index).unwrap());
+        let identifier = format!("{:08} {:08}", op_index, self.get_line(op_index).unwrap());
 
         match op_code {
             OpCode::Constant |

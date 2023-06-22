@@ -22,5 +22,7 @@ pub enum OpCode {
 
     JumpOffset(usize), JumpIfFalse, Jump, JumpIfTrue, Loop,
 
-    Return
+    Return,
+
+    Start, Stop
 }
