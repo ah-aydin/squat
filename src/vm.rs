@@ -23,7 +23,6 @@ pub enum InterpretResult {
 pub struct VM {
     stack: Vec<SquatValue>,
     globals: Vec<Option<SquatValue>>,
-    global_variable_indicies: HashMap<String, usize>,
     constants: ValueArray,
     main_chunk: Chunk,
     global_var_decl_chunk: Chunk,
@@ -35,7 +34,6 @@ impl VM {
         VM {
             stack: Vec::with_capacity(INITIAL_STACK_SIZE),
             globals: vec![None; INITIAL_STACK_SIZE],
-            global_variable_indicies: HashMap::new(),
             constants: ValueArray::new("Constants"),
             main_chunk: Chunk::new("Main"),
             global_var_decl_chunk: Chunk::new("Global Variable Decl"),
@@ -48,7 +46,6 @@ impl VM {
             &source,
             &mut self.main_chunk,
             &mut self.global_var_decl_chunk,
-            &mut self.global_variable_indicies,
             &mut self.constants
         );
         let interpret_result = match compiler.compile() {

@@ -65,7 +65,7 @@ pub struct Compiler<'a> {
     global_var_decl_chunk: &'a mut Chunk,
     chunk_mode: ChunkMode,
 
-    global_variable_indicies: &'a mut HashMap<String, usize>,
+    global_variable_indicies: HashMap<String, usize>,
     constants: &'a mut ValueArray,
 
     locals: Vec<Local>,
@@ -83,7 +83,6 @@ impl<'a> Compiler<'a> {
         source: &'a String,
         main_chunk: &'a mut Chunk,
         global_var_decl_chunk: &'a mut Chunk,
-        global_variable_indicies: &'a mut HashMap<String, usize>,
         constants: &'a mut ValueArray
     ) -> Compiler<'a> {
         Compiler {
@@ -95,7 +94,7 @@ impl<'a> Compiler<'a> {
             global_var_decl_chunk,
             chunk_mode: ChunkMode::Main,
 
-            global_variable_indicies,
+            global_variable_indicies: HashMap::new(),
             constants,
 
             locals: Vec::with_capacity(INITIAL_LOCALS_VECTOR_SIZE),

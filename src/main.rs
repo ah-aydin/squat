@@ -6,36 +6,9 @@ mod token;
 mod value;
 mod vm;
 
-use std::{env, fs, io::{self, Write}};
+use std::{env, fs};
 use log::{debug, error, info};
 use vm::{VM, InterpretResult};
-
-fn repl() {
-    info!("Starting repl");
-
-    let mut vm = VM::new();
-    let stdin = io::stdin();
-
-    loop {
-        print!("> ");
-        if let Err(err) = io::stdout().flush() {
-            error!("Failed to flush: {}", err);
-            break;
-        }
-
-        let mut user_input = String::new();
-        if let Err(err) = stdin.read_line(&mut user_input) {
-            error!("Failed to read user input: {}", err);
-            continue;
-        }
-
-        if user_input.trim().len() == 0 {
-            break;
-        }
-
-        vm.interpret_source(user_input);
-    }
-}
 
 fn run_file(file: &String) {
     let mut vm = VM::new();
@@ -62,10 +35,7 @@ fn main() -> Result<(), ()> {
     let args: Vec<String> = env::args().collect();
     debug!("{:?}", args);
 
-    if args.len() == 1 {
-        panic!("Repl support went caput with the adition of the main function as entry point");
-        repl();
-    } else if args.len() == 2 {
+    if args.len() == 2 {
         run_file(&args[1]);
     } else {
         error!("Usage: squat [path]\n");
