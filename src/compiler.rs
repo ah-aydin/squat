@@ -45,6 +45,11 @@ pub enum CompileStatus {
     Fail
 }
 
+pub enum ChunkMode {
+    Main,
+    Global
+}
+
 struct Local {
     name: String,
     // If this value is missing, the variable is not initialized yet.
@@ -56,7 +61,10 @@ pub struct Compiler<'a> {
     previous_token: Option<Token>,
     current_token: Option<Token>,
 
-    chunk: &'a mut Chunk,
+    main_chunk: &'a mut Chunk,
+    global_var_decl_chunk: &'a mut Chunk,
+    chunk_mode: ChunkMode,
+
     global_variable_indicies: &'a mut HashMap<String, usize>,
     constants: &'a mut ValueArray,
 
@@ -73,7 +81,8 @@ pub struct Compiler<'a> {
 impl<'a> Compiler<'a> {
     pub fn new(
         source: &'a String,
-        chunk: &'a mut Chunk,
+        main_chunk: &'a mut Chunk,
+        global_var_decl_chunk: &'a mut Chunk,
         global_variable_indicies: &'a mut HashMap<String, usize>,
         constants: &'a mut ValueArray
     ) -> Compiler<'a> {
@@ -82,7 +91,10 @@ impl<'a> Compiler<'a> {
             previous_token: None,
             current_token: None,
             
-            chunk,
+            main_chunk,
+            global_var_decl_chunk,
+            chunk_mode: ChunkMode::Main,
+
             global_variable_indicies,
             constants,
 
@@ -130,10 +142,9 @@ impl<'a> Compiler<'a> {
         } else if self.check_current(TokenType::Func) {
             self.function_declaration();
         } else if self.check_current(TokenType::Var) {
-            panic!("I screwed up the global variable declarations with the main func implementation");
-            self.var_declaration();
+            self.var_declaration(true);
         } else {
-            self.compile_error("Statements are not allowed outside of function blocks");
+            self.compile_error("Statements are not allowed outside of function blocks.");
         }
 
         if self.panic_mode {
@@ -147,7 +158,7 @@ impl<'a> Compiler<'a> {
         } else if self.check_current(TokenType::Func) {
             self.compile_error("You cannot define a function inside another function");
         } else if self.check_current(TokenType::Var) {
-            self.var_declaration();
+            self.var_declaration(false);
         } else {
             self.statement();
         }
@@ -170,7 +181,7 @@ impl<'a> Compiler<'a> {
             self.consume_current(TokenType::RightParenthesis, "");
             self.consume_current(TokenType::LeftBrace, "Expected '{' to define function body");
             self.write_op_code(OpCode::Start);
-            self.starting_instruction = self.chunk.get_size();
+            self.starting_instruction = self.main_chunk.get_size();
             self.begin_scope();
             self.block();
             self.end_scope();
@@ -181,8 +192,18 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    fn var_declaration(&mut self) {
-        let index = self.parse_variable("Expect variable name");
+    fn var_declaration(&mut self, global: bool) {
+        let index = match self.parse_variable("Expect variable name") {
+            Ok(value) => value,
+            Err(()) => {
+                return;
+            }
+        };
+
+
+        if global {
+            self.chunk_mode = ChunkMode::Global;
+        }
 
         if self.check_current(TokenType::Equal) {
             self.expression();
@@ -193,9 +214,13 @@ impl<'a> Compiler<'a> {
         self.consume_current(TokenType::Semicolon, "Expect ';' after variable declaration.");
 
         self.define_variable(index);
+
+        if global {
+            self.chunk_mode = ChunkMode::Main;
+        }
     }
 
-    fn parse_variable(&mut self, error_msg: &str) -> usize {
+    fn parse_variable(&mut self, error_msg: &str) -> Result<usize, ()> {
         self.consume_current(TokenType::Identifier, error_msg);
 
         // Local variable
@@ -219,22 +244,23 @@ impl<'a> Compiler<'a> {
                             &self.scope_depth
                         )
                     );
-                    return 0;
+                    return Ok(0);
                 }
             }
             let local = Local { name, depth: None };
             self.locals.push(local);
-            return 0;
+            return Ok(0);
         }
 
         let var_name = self.previous_token.as_ref().unwrap().lexeme.clone();
         if let Some(index) = self.global_variable_indicies.get(&var_name) {
-            return *index;
+            self.compile_error(&format!("Variable {} is allready defined", var_name));
+            return Err(());
         }
 
         let index = self.global_variable_indicies.len();
         self.global_variable_indicies.insert(var_name, self.global_variable_indicies.len());
-        index
+        Ok(index)
     }
 
     fn define_variable(&mut self, index: usize) {
@@ -293,7 +319,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn while_statement(&mut self) {
-        let loop_start = self.chunk.get_size();
+        let loop_start = self.main_chunk.get_size();
         self.consume_current(TokenType::LeftParenthesis, "Expected '(' after 'while'");
         self.expression();
         self.consume_current(TokenType::RightParenthesis, "Expected closing ')'");
@@ -312,12 +338,12 @@ impl<'a> Compiler<'a> {
 
         self.consume_current(TokenType::LeftParenthesis, "Expected '(' after 'for'");
         if self.check_current(TokenType::Var) {
-            self.var_declaration();
+            self.var_declaration(false);
         } else if !self.check_current(TokenType::Semicolon) {
             self.expression_statement();
         }
 
-        let mut loop_start = self.chunk.get_size();
+        let mut loop_start = self.main_chunk.get_size();
         let mut exit_jump: Option<usize> = None;
         if !self.check_current(TokenType::Semicolon) {
             self.expression();
@@ -329,7 +355,7 @@ impl<'a> Compiler<'a> {
 
         if !self.check_current(TokenType::RightParenthesis) {
             let body_jump = self.emit_jump(OpCode::Jump);
-            let increment_start = self.chunk.get_size();
+            let increment_start = self.main_chunk.get_size();
             self.expression();
             self.write_op_code(OpCode::Pop);
             self.consume_current(TokenType::RightParenthesis, "Expect closing ')'");
@@ -481,9 +507,11 @@ impl<'a> Compiler<'a> {
             if let Some(index) = self.global_variable_indicies.get(&var_name) {
                 arg = *index;
             } else {
-                let index = self.global_variable_indicies.len();
-                self.global_variable_indicies.insert(var_name, self.global_variable_indicies.len());
-                arg = index;
+                self.compile_error(&format!("Variable with name {} is not defined.", var_name));
+                return;
+                // let index = self.global_variable_indicies.len();
+                // self.global_variable_indicies.insert(var_name, self.global_variable_indicies.len());
+                // arg = index;
             }
 
             set_op_code = OpCode::SetGlobal;
@@ -544,18 +572,6 @@ impl<'a> Compiler<'a> {
         }
         panic!("Unreachable line");
     }
-    
-    fn consume_previous(&mut self, expected_type: TokenType, message: &str) {
-        if let Some(token) = &self.previous_token {
-            if token.token_type == expected_type {
-                return;
-            }
-            let lexeme = &self.previous_token.as_ref().unwrap().lexeme;
-            self.compile_error(&format!("Error at '{}': {}", lexeme, message));
-            return;
-        }
-        panic!("Unreachable line");
-    }
 
     fn check_current(&mut self, expected_type: TokenType) -> bool {
         if let Some(token) = &self.current_token {
@@ -577,7 +593,6 @@ impl<'a> Compiler<'a> {
             match self.current_token.as_ref().unwrap().token_type {
                 TokenType::Class | TokenType::Func | TokenType::Var | TokenType::For |
                     TokenType::If | TokenType::While | TokenType::Print | TokenType::Return => {
-                        self.advance();
                         break;
                     }
                 _ => {}
@@ -663,18 +678,18 @@ impl<'a> Compiler<'a> {
     fn emit_jump(&mut self, op_code: OpCode) -> usize {
         self.write_op_code(op_code);
         self.write_op_code(OpCode::JumpOffset(120));
-        self.chunk.get_size() - 1
+        self.main_chunk.get_size() - 1
     }
 
     fn patch_jump(&mut self, op_location: usize) {
-        let jump = self.chunk.get_size() - op_location - 1;
-        self.chunk.set_jump_at(op_location, jump);
+        let jump = self.main_chunk.get_size() - op_location - 1;
+        self.main_chunk.set_jump_at(op_location, jump);
     }
 
     fn emit_loop(&mut self, loop_start: usize) {
         self.write_op_code(OpCode::Loop);
 
-        let offset = self.chunk.get_size() - loop_start + 1;
+        let offset = self.main_chunk.get_size() - loop_start + 1;
         self.write_op_code(OpCode::JumpOffset(offset));
     }
 
@@ -683,7 +698,11 @@ impl<'a> Compiler<'a> {
     //////////////////////////////////////////////////////////////////////////
 
     fn write_op_code(&mut self, op_code: OpCode) {
-        self.chunk.write(op_code, self.previous_token.as_ref().unwrap().line);
+        let line = self.previous_token.as_ref().unwrap().line;
+        match self.chunk_mode {
+            ChunkMode::Main => self.main_chunk.write(op_code, line),
+            ChunkMode::Global => self.global_var_decl_chunk.write(op_code, line)
+        };
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -707,173 +726,4 @@ impl<'a> Compiler<'a> {
         let line = self.previous_token.as_ref().unwrap().line;
         println!("[COMPILE WARNING] (Line {}) {}", line, message);
     }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    fn interpret_binary_op_code(chunk: &mut Chunk, op_code: OpCode) {
-        assert_eq!(chunk.next(), Some(&OpCode::Constant));        
-        assert_eq!(chunk.next(), Some(&OpCode::Index(0)));
-        assert_eq!(chunk.next(), Some(&OpCode::Constant));
-        assert_eq!(chunk.next(), Some(&OpCode::Index(1)));
-        assert_eq!(chunk.next(), Some(&op_code));
-    }
-
-    #[test]
-    fn op_false() {
-        let mut chunk = Chunk::new("True".to_owned());
-        let source = String::from("false");
-        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
-        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
-        compiler.compile();
-        assert_eq!(chunk.next(), Some(&OpCode::False));
-    }
-
-    #[test]
-    fn op_true() {
-        let mut chunk = Chunk::new("True".to_owned());
-        let source = String::from("true");
-        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
-        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
-        compiler.compile();
-        assert_eq!(chunk.next(), Some(&OpCode::True));
-    }
-
-    #[test]
-    fn add() {
-        let mut chunk = Chunk::new("Addition".to_owned());
-        let source = String::from("1 + 2");
-        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
-        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
-        compiler.compile();
-        interpret_binary_op_code(&mut chunk, OpCode::Add);
-    }
-
-    #[test]
-    fn subract() {
-        let mut chunk = Chunk::new("Subtraction".to_owned());
-        let source = String::from("1 - 2");
-        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
-        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
-        compiler.compile();
-        interpret_binary_op_code(&mut chunk, OpCode::Subtract);
-    }
-
-    #[test]
-    fn multiply() {
-        let mut chunk = Chunk::new("Multiply".to_owned());
-        let source = String::from("1 * 2");
-        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
-        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
-        compiler.compile();
-        interpret_binary_op_code(&mut chunk, OpCode::Multiply);
-    }
-
-    #[test]
-    fn divide() {
-        let mut chunk = Chunk::new("Divide".to_owned());
-        let source = String::from("1 / 2");
-        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
-        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
-        compiler.compile();
-        interpret_binary_op_code(&mut chunk, OpCode::Divide);
-    }
-
-    #[test]
-    fn concat() {
-        let mut chunk = Chunk::new("Concat".to_owned());
-        let source = String::from("\"a\" ++ \"b\"");
-        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
-        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
-        compiler.compile();
-        interpret_binary_op_code(&mut chunk, OpCode::Concat);
-    }
-
-    #[test]
-    fn equal() {
-        let mut chunk = Chunk::new("Equal".to_owned());
-        let source = String::from("1 == 2");
-        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
-        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
-        compiler.compile();
-        interpret_binary_op_code(&mut chunk, OpCode::Equal);
-    }
-
-    #[test]
-    fn not_equal() {
-        let mut chunk = Chunk::new("Not Equal".to_owned());
-        let source = String::from("1 != 2");
-        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
-        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
-        compiler.compile();
-        interpret_binary_op_code(&mut chunk, OpCode::NotEqual);
-    }
-
-    #[test]
-    fn greater() {
-        let mut chunk = Chunk::new("Greater".to_owned());
-        let source = String::from("1 > 2");
-        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
-        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
-        compiler.compile();
-        interpret_binary_op_code(&mut chunk, OpCode::Greater);
-    }
-
-    #[test]
-    fn greater_equal() {
-        let mut chunk = Chunk::new("Greater Equal".to_owned());
-        let source = String::from("1 >= 2");
-        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
-        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
-        compiler.compile();
-        interpret_binary_op_code(&mut chunk, OpCode::GreaterEqual);
-    }
-
-    #[test]
-    fn less() {
-        let mut chunk = Chunk::new("Less".to_owned());
-        let source = String::from("1 < 2");
-        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
-        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
-        compiler.compile();
-        interpret_binary_op_code(&mut chunk, OpCode::Less);
-    }
-
-    #[test]
-    fn less_equal() {
-        let mut chunk = Chunk::new("Less Equal".to_owned());
-        let source = String::from("1 <= 2");
-        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
-        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
-        compiler.compile();
-        interpret_binary_op_code(&mut chunk, OpCode::LessEqual);
-    }
-
-    #[test]
-    fn not() {
-        let mut chunk = Chunk::new("Less Equal".to_owned());
-        let source = String::from("!1");
-        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
-        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
-        compiler.compile();
-        assert_eq!(chunk.next(), Some(&OpCode::Constant));
-        assert_eq!(chunk.next(), Some(&OpCode::Index(0)));
-        assert_eq!(chunk.next(), Some(&OpCode::Not));
-    }
-
-    #[test]
-    fn negate() {
-        let mut chunk = Chunk::new("Less Equal".to_owned());
-        let source = String::from("-1");
-        let mut global_variable_indicies: HashMap<String, usize> = HashMap::new();
-        let mut compiler = Compiler::new(&source, &mut chunk, &mut global_variable_indicies);
-        compiler.compile();
-        assert_eq!(chunk.next(), Some(&OpCode::Constant));
-        assert_eq!(chunk.next(), Some(&OpCode::Index(0)));
-        assert_eq!(chunk.next(), Some(&OpCode::Negate));
-    }
-
-    // TODO add more specific tests when not in flight and your brain can work
 }

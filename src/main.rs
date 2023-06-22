@@ -63,6 +63,7 @@ fn main() -> Result<(), ()> {
     debug!("{:?}", args);
 
     if args.len() == 1 {
+        panic!("Repl support went caput with the adition of the main function as entry point");
         repl();
     } else if args.len() == 2 {
         run_file(&args[1]);

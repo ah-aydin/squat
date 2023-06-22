@@ -1,7 +1,6 @@
 use crate::value::{ValueArray, SquatValue};
 use crate::op_code::OpCode;
 
-#[cfg(debug_assertions)]
 use log::debug;
 
 #[derive(Debug, PartialEq)]
@@ -28,20 +27,20 @@ pub struct Chunk {
     name: String,
     code: Vec<OpCode>,
     pub current_instruction: usize,
-    lines: Vec<Line>
+    lines: Vec<Line>,
 }
 
 impl Chunk {
-    pub fn new(name: String) -> Chunk {
+    pub fn new(name: &str) -> Chunk {
         Chunk {
-            name: String::from(&name) + " chunk",
+            name: String::from(name) + " Chunk",
             code: Vec::new(),
             current_instruction: 0,
-            lines: Vec::new()
+            lines: Vec::new(),
         }
     }
 
-    #[cfg(debug_assertions)]
+    #[cfg(feature="log_instructions")]
     pub fn disassemble(&self) {
         debug!("==== {} ====", self.name);
 
@@ -52,17 +51,15 @@ impl Chunk {
         }
     }
 
-    #[cfg(debug_assertions)]
     pub fn disassemble_current_instruction(&self) {
         let op_code = &self.code[self.current_instruction];
         self.disassemble_instruction(op_code, self.current_instruction);
     }
 
     pub fn get_current_instruction_line(&self) -> u32 {
-        self.get_line(self.current_instruction).unwrap()
+        self.get_line(self.current_instruction).unwrap_or(0)
     }
 
-    #[cfg(debug_assertions)]
     fn disassemble_instruction(&self, op_code: &OpCode, op_index: usize) -> usize  {
         // If this lines panics, there is something wrong with the implementation
         let identifier = format!("{:08} {:08}", op_index, self.get_line(op_index).unwrap());
@@ -135,12 +132,8 @@ impl Chunk {
         None
     }
 
-    pub fn reset(&mut self) {
-        self.current_instruction = 0;
-    }
-
-    pub fn write(&mut self, byte: OpCode, line: u32) {
-        self.code.push(byte);
+    pub fn write(&mut self, op_code: OpCode, line: u32) {
+        self.code.push(op_code);
         if let Some(last) = self.lines.last_mut() {
             if last.line == line {
                 last.increment();

@@ -25,7 +25,8 @@ pub struct VM {
     globals: Vec<Option<SquatValue>>,
     global_variable_indicies: HashMap<String, usize>,
     constants: ValueArray,
-    chunk: Chunk,
+    main_chunk: Chunk,
+    global_var_decl_chunk: Chunk,
     had_error: bool
 }
 
@@ -36,7 +37,8 @@ impl VM {
             globals: vec![None; INITIAL_STACK_SIZE],
             global_variable_indicies: HashMap::new(),
             constants: ValueArray::new("Constants"),
-            chunk: Chunk::new("Main".to_owned()),
+            main_chunk: Chunk::new("Main"),
+            global_var_decl_chunk: Chunk::new("Global Variable Decl"),
             had_error: false
         }
     }
@@ -44,32 +46,38 @@ impl VM {
     pub fn interpret_source(&mut self, source: String) -> InterpretResult {
         let mut compiler = Compiler::new(
             &source,
-            &mut self.chunk,
+            &mut self.main_chunk,
+            &mut self.global_var_decl_chunk,
             &mut self.global_variable_indicies,
             &mut self.constants
         );
         let interpret_result = match compiler.compile() {
-            CompileStatus::Success(starting_instruction) => {
+            CompileStatus::Success(main_start) => {
                 drop(compiler);
-                #[cfg(feature = "log_stack")]
+                #[cfg(feature = "log_instructions")]
                 {
                     println!("---------------- INSTRUCTIONS ----------------");
-                    self.chunk.disassemble();
+                    self.global_var_decl_chunk.disassemble();
+                    self.main_chunk.disassemble();
                     println!("----------------------------------------------");
                 }
+                let starting_instruction = self.main_chunk.get_size();
+                while let Some(instruction) = self.global_var_decl_chunk.next() {
+                    self.main_chunk.write(*instruction, self.global_var_decl_chunk.get_current_instruction_line());
+                }
+                self.main_chunk.write(OpCode::JumpTo(main_start), 0);
                 self.interpret_chunk(starting_instruction)
             },
             CompileStatus::Fail => InterpretResult::InterpretCompileError
         };
 
-        self.chunk.clear_instructions();
+        self.main_chunk.clear_instructions();
         interpret_result
     }
 
     fn interpret_chunk(&mut self, starting_instruction: usize) -> InterpretResult {
-        debug!("==== Interpret Chunk {} ====", self.chunk.get_name());
-        self.chunk.reset();
-        self.chunk.current_instruction = starting_instruction;
+        debug!("==== Interpret Chunk {} ====", self.main_chunk.get_name());
+        self.main_chunk.current_instruction = starting_instruction;
 
         loop {
             #[cfg(feature = "log_stack")]
@@ -90,18 +98,17 @@ impl VM {
             }
 
             #[cfg(debug_assertions)]
-            self.chunk.disassemble_current_instruction();
+            self.main_chunk.disassemble_current_instruction();
 
             if self.had_error {
                 return InterpretResult::InterpretRuntimeError;
             }
 
-            if let Some(instruction) = self.chunk.next() {
+            if let Some(instruction) = self.main_chunk.next() {
                 match instruction {
                     OpCode::Constant => {
-                        if let Some(OpCode::Index(index)) = self.chunk.next() {
+                        if let Some(OpCode::Index(index)) = self.main_chunk.next() {
                             let index = *index;
-                            //let constant: &SquatValue = self.chunk.read_constant(index);
                             let constant: &SquatValue = self.constants.get(index);
                             self.stack.push(constant.clone()); // TODO figure out a way to get rid
                                                                // of clone here
@@ -172,7 +179,7 @@ impl VM {
                     },
 
                     OpCode::DefineGlobal => {
-                        if let Some(OpCode::Index(index)) = self.chunk.next() {
+                        if let Some(OpCode::Index(index)) = self.main_chunk.next() {
                             let index = *index;
                             if let Some(value) = self.stack.pop() {
                                 self.globals.insert(index, Some(value));
@@ -184,7 +191,7 @@ impl VM {
                         }
                     },
                     OpCode::GetGlobal => {
-                        if let Some(OpCode::Index(index)) = self.chunk.next() {
+                        if let Some(OpCode::Index(index)) = self.main_chunk.next() {
                             let index = *index;
                             if let Some(Some(value)) = self.globals.get(index) {
                                 self.stack.push(value.clone());
@@ -196,7 +203,7 @@ impl VM {
                         }
                     },
                     OpCode::SetGlobal => {
-                        if let Some(OpCode::Index(index)) = self.chunk.next() {
+                        if let Some(OpCode::Index(index)) = self.main_chunk.next() {
                             let index = *index;
                             if let Some(value) = self.stack.last() {
                                 if let Some(Some(_value)) = self.globals.get(index) {
@@ -213,14 +220,14 @@ impl VM {
                     },
 
                     OpCode::GetLocal => {
-                        if let Some(OpCode::Index(index)) = self.chunk.next() {
+                        if let Some(OpCode::Index(index)) = self.main_chunk.next() {
                             self.stack.push(self.stack[*index].clone());
                         } else {
                             panic!("GetLocal OpCode must be followed by Index OpCode");
                         }
                     },
                     OpCode::SetLocal => {
-                        if let Some(OpCode::Index(index)) = self.chunk.next() {
+                        if let Some(OpCode::Index(index)) = self.main_chunk.next() {
                             if let Some(value) = self.stack.last() {
                                 self.stack[*index] = value.clone();
                             } else {
@@ -231,11 +238,14 @@ impl VM {
                         }
                     },
 
+                    OpCode::JumpTo(instruction_number) => {
+                        self.main_chunk.current_instruction = *instruction_number;
+                    }
                     OpCode::JumpIfFalse => {
-                        if let Some(OpCode::JumpOffset(offset)) = self.chunk.next() {
+                        if let Some(OpCode::JumpOffset(offset)) = self.main_chunk.next() {
                             if let Some(value) = self.stack.last() {
                                 if !is_truthy(value) {
-                                    self.chunk.current_instruction += offset.clone();
+                                    self.main_chunk.current_instruction += offset.clone();
                                 }
                             } else {
                                 panic!("JumpIfFalse OpCode expect a value to be on the stack");
@@ -245,17 +255,17 @@ impl VM {
                         }
                     },
                     OpCode::Jump => {
-                        if let Some(OpCode::JumpOffset(offset)) = self.chunk.next() {
-                            self.chunk.current_instruction += offset.clone();
+                        if let Some(OpCode::JumpOffset(offset)) = self.main_chunk.next() {
+                            self.main_chunk.current_instruction += offset.clone();
                         } else {
                             panic!("Jump OpCode must be followd by JumpOffset OpCode");
                         }
                     },
                     OpCode::JumpIfTrue => {
-                        if let Some(OpCode::JumpOffset(offset)) = self.chunk.next() {
+                        if let Some(OpCode::JumpOffset(offset)) = self.main_chunk.next() {
                             if let Some(value) = self.stack.last() {
                                 if is_truthy(value) {
-                                    self.chunk.current_instruction += offset.clone();
+                                    self.main_chunk.current_instruction += offset.clone();
                                 }
                             } else {
                                 panic!("JumpIfTrue OpCode expect a value to be on the stack");
@@ -265,8 +275,8 @@ impl VM {
                         }
                     },
                     OpCode::Loop => {
-                        if let Some(OpCode::JumpOffset(offset)) = self.chunk.next() {
-                            self.chunk.current_instruction -= offset.clone();
+                        if let Some(OpCode::JumpOffset(offset)) = self.main_chunk.next() {
+                            self.main_chunk.current_instruction -= offset.clone();
                         } else {
                             panic!("Loop OpCode must be followd by JumpOffset OpCode");
                         }
@@ -324,7 +334,7 @@ impl VM {
     }
 
     fn runtime_error(&mut self, message: &str) {
-        println!("[ERROR] (Line {}) {}", self.chunk.get_current_instruction_line(), message);
+        println!("[ERROR] (Line {}) {}", self.main_chunk.get_current_instruction_line(), message);
         self.had_error = true;
     }
 }
