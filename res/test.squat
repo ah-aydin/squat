@@ -14,7 +14,9 @@ func printHelloThere() {
 }
 
 func exampleFunc(num1, num2) {
+    print "The sum is";
     print num1 + num2;
+    return num1 + num2;
 }
 
 func rec(i) {
@@ -47,7 +49,7 @@ func main() {
     print e + 10;
     var a = 5;
     print a;
-    exampleFunc(10, 90);
+    exampleFunc(exampleFunc(900, exampleFunc(80, 10)), 9);
     exampleFunc(a, 90);
     print a + 123123;
 }

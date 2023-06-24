@@ -444,7 +444,6 @@ impl<'a> Compiler<'a> {
         self.expression();
         self.consume_current(TokenType::Semicolon, "Expect ';' after expression");
         self.write_op_code(OpCode::Pop);
-        println!("POPING IN FUNCTION {:?}", &self.called_function);
     }
 
     //////////////////////////////////////////////////////////////////////////
