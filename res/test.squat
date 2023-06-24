@@ -22,6 +22,28 @@ func main() {
     } else {
         print "goodbye";
     }
+    print 1;
+
+    var i = 0;
+    while (i < 5) {
+        print i;
+        i = i + 1;
+    }
+
+    /*var i = 0;
+    while (i < 5) {
+        print i;
+        if (i == 2 or i == 3) {
+            print "I is 2 or 3";
+        }
+        i = i + 1;
+    }*/
+
+    print "For 1";
+    for (var i = 0; i < 10; i = i + 2) {
+        print i;
+    }
+
     /*print "hello world";
     print global_var;
     var number1 = 10;
@@ -93,20 +115,6 @@ func main() {
     }
     if (1 != 1 or 2 != 2) {
         print "This is true 7";
-    }
-
-    var i = 0;
-    while (i < 5) {
-        print i;
-        if (i == 2 or i == 3) {
-            print "I is 2 or 3";
-        }
-        i = i + 1;
-    }
-
-    print "For 1";
-    for (var i = 0; i < 10; i = i + 2) {
-        print i;
     }
     print "For 2";
     for (var i = 0; i < 10; ) {

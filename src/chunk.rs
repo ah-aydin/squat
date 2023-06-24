@@ -64,16 +64,6 @@ impl Chunk {
         let identifier = format!("{:08} {:08}", op_index, self.get_line(op_index).unwrap());
 
         match op_code {
-            OpCode::Jump | OpCode::JumpIfFalse | OpCode::JumpIfTrue | OpCode::Loop => { // These require JumpOffset OpCode follow up
-                if op_index == self.code.len() - 1 {
-                    panic!("{:?} must be followed by JumpOffset - {}", op_code, identifier);
-                } else if let OpCode::JumpOffset(_offset) = self.code[op_index + 1] {
-                    debug!("{}: {:?} {:?}", identifier, op_code, &self.code[op_index + 1]);
-                    op_index + 2
-                } else {
-                    panic!("{:?} must be followed by Index - {}", op_code, identifier)
-                }
-            }
             _ => {
                 debug!("{}: {:?}", identifier, op_code);
                 op_index + 1
@@ -97,8 +87,10 @@ impl Chunk {
 
     pub fn set_jump_at(&mut self, location: usize, offset: usize) {
         match self.code[location] {
-            OpCode::JumpOffset(_) => self.code[location] = OpCode::JumpOffset(offset),
-            _ => panic!("Trying to modify instruction {:?} into {:?}", self.code[location], OpCode::JumpOffset(offset))
+            OpCode::JumpIfFalse(_) => self.code[location] = OpCode::JumpIfFalse(offset),
+            OpCode::Jump(_) => self.code[location] = OpCode::Jump(offset),
+            OpCode::JumpIfTrue(_) => self.code[location] = OpCode::JumpIfTrue(offset),
+            _ => panic!("Trying to modify instruction {:?} into a jump instruction", self.code[location])
         };
     }
 

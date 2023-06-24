@@ -133,6 +133,8 @@ impl<'a> Compiler<'a> {
         debug!("Global variable indicies {:?}", self.global_variable_indicies);
         #[cfg(debug_assertions)]
         debug!("Functions {:?}", self.functions);
+        #[cfg(debug_assertions)]
+        debug!("Constants {:?}", self.constants);
 
         compile_status
     }
@@ -340,11 +342,11 @@ impl<'a> Compiler<'a> {
         self.expression();
         self.consume_current(TokenType::RightParenthesis, "Expected closing ')'");
 
-        let then_jump = self.emit_jump(OpCode::JumpIfFalse);
+        let then_jump = self.emit_jump(OpCode::JumpIfFalse(usize::MAX));
         self.write_op_code(OpCode::Pop);
         self.statement();
 
-        let else_jump = self.emit_jump(OpCode::Jump);
+        let else_jump = self.emit_jump(OpCode::Jump(usize::MAX));
         self.patch_jump(then_jump);
         self.write_op_code(OpCode::Pop);
 
@@ -361,7 +363,7 @@ impl<'a> Compiler<'a> {
         self.expression();
         self.consume_current(TokenType::RightParenthesis, "Expected closing ')'");
 
-        let exit_jump = self.emit_jump(OpCode::JumpIfFalse);
+        let exit_jump = self.emit_jump(OpCode::JumpIfFalse(usize::MAX));
         self.write_op_code(OpCode::Pop);
         self.statement();
         self.emit_loop(loop_start);
@@ -386,12 +388,12 @@ impl<'a> Compiler<'a> {
             self.expression();
             self.consume_current(TokenType::Semicolon, "Expected ';' after loop condition");
 
-            exit_jump = Some(self.emit_jump(OpCode::JumpIfFalse));
+            exit_jump = Some(self.emit_jump(OpCode::JumpIfFalse(usize::MAX)));
             self.write_op_code(OpCode::Pop);
         }
 
         if !self.check_current(TokenType::RightParenthesis) {
-            let body_jump = self.emit_jump(OpCode::Jump);
+            let body_jump = self.emit_jump(OpCode::Jump(usize::MAX));
             let increment_start = self.main_chunk.get_size();
             self.expression();
             self.write_op_code(OpCode::Pop);
@@ -443,14 +445,14 @@ impl<'a> Compiler<'a> {
     }
 
     fn and(&mut self) {
-        let end_jump = self.emit_jump(OpCode::JumpIfFalse);
+        let end_jump = self.emit_jump(OpCode::JumpIfFalse(usize::MAX));
         self.write_op_code(OpCode::Pop);
         self.parse_precedence(Precedence::And);
         self.patch_jump(end_jump);
     }
 
     fn or(&mut self) {
-        let end_jump = self.emit_jump(OpCode::JumpIfTrue);
+        let end_jump = self.emit_jump(OpCode::JumpIfTrue(usize::MAX));
         self.write_op_code(OpCode::Pop);
         self.parse_precedence(Precedence::Or);
         self.patch_jump(end_jump);
@@ -721,7 +723,6 @@ impl<'a> Compiler<'a> {
     
     fn emit_jump(&mut self, op_code: OpCode) -> usize {
         self.write_op_code(op_code);
-        self.write_op_code(OpCode::JumpOffset(usize::MAX));
         self.main_chunk.get_size() - 1
     }
 
@@ -731,10 +732,10 @@ impl<'a> Compiler<'a> {
     }
 
     fn emit_loop(&mut self, loop_start: usize) {
-        self.write_op_code(OpCode::Loop);
+        self.write_op_code(OpCode::Loop(loop_start));
 
-        let offset = self.main_chunk.get_size() - loop_start + 1;
-        self.write_op_code(OpCode::JumpOffset(offset));
+        // let offset = self.main_chunk.get_size() - loop_start + 1;
+        // self.write_op_code(OpCode::JumpOffset(offset));
     }
 
     //////////////////////////////////////////////////////////////////////////

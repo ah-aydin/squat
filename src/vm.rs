@@ -236,37 +236,25 @@ impl VM {
                     OpCode::JumpTo(instruction_number) => {
                         self.main_chunk.current_instruction = *instruction_number;
                     }
-                    OpCode::JumpIfFalse => {
-                        if let Some(OpCode::JumpOffset(offset)) = self.main_chunk.next() {
-                            if let Some(value) = self.stack.last() {
-                                if !is_truthy(value) {
-                                    self.main_chunk.current_instruction += *offset;
-                                }
-                            } else {
-                                panic!("JumpIfFalse OpCode expect a value to be on the stack");
+                    OpCode::JumpIfFalse(offset) => {
+                        if let Some(value) = self.stack.last() {
+                            if !is_truthy(value) {
+                                self.main_chunk.current_instruction += *offset;
                             }
                         } else {
-                            panic!("JumpIfFalse OpCode must be followed by JumpOffset OpCode");
+                            panic!("JumpIfFalse OpCode expect a value to be on the stack");
                         }
                     },
-                    OpCode::Jump => {
-                        if let Some(OpCode::JumpOffset(offset)) = self.main_chunk.next() {
-                            self.main_chunk.current_instruction += *offset;
-                        } else {
-                            panic!("Jump OpCode must be followd by JumpOffset OpCode");
-                        }
+                    OpCode::Jump(offset) => {
+                        self.main_chunk.current_instruction += *offset;
                     },
-                    OpCode::JumpIfTrue => {
-                        if let Some(OpCode::JumpOffset(offset)) = self.main_chunk.next() {
-                            if let Some(value) = self.stack.last() {
-                                if is_truthy(value) {
-                                    self.main_chunk.current_instruction += *offset;
-                                }
-                            } else {
-                                panic!("JumpIfTrue OpCode expect a value to be on the stack");
+                    OpCode::JumpIfTrue(offset) => {
+                        if let Some(value) = self.stack.last() {
+                            if is_truthy(value) {
+                                self.main_chunk.current_instruction += *offset;
                             }
                         } else {
-                            panic!("JumpIfTrue OpCode must be followed by JumpOffset OpCode");
+                            panic!("JumpIfTrue OpCode expect a value to be on the stack");
                         }
                     },
                     OpCode::JumpBack => {
@@ -276,12 +264,8 @@ impl VM {
                             panic!("JumpBack OpCode must contain a CallFrame in call_stack");
                         }
                     },
-                    OpCode::Loop => {
-                        if let Some(OpCode::JumpOffset(offset)) = self.main_chunk.next() {
-                            self.main_chunk.current_instruction -= *offset;
-                        } else {
-                            panic!("Loop OpCode must be followd by JumpOffset OpCode");
-                        }
+                    OpCode::Loop(offset) => {
+                        self.main_chunk.current_instruction = *offset;
                     }
 
                     OpCode::Call(func_instruction_index) => {
