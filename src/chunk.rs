@@ -64,18 +64,6 @@ impl Chunk {
         let identifier = format!("{:08} {:08}", op_index, self.get_line(op_index).unwrap());
 
         match op_code {
-            OpCode::Constant |
-                OpCode::DefineGlobal | OpCode::GetGlobal | OpCode::SetGlobal |
-                OpCode::GetLocal | OpCode::SetLocal => { // these require an Index OpCode follow up
-                    if op_index == self.code.len() - 1 {
-                        panic!("{:?} must be followed by Index - {}", op_code, identifier)
-                    } else if let OpCode::Index(_index) = self.code[op_index + 1] {
-                        debug!("{}: {:?} {:?}", identifier, op_code, &self.code[op_index + 1]);
-                        op_index + 2
-                    } else {
-                        panic!("{:?} must be followed by Index - {}", op_code, identifier)
-                    }
-                },
             OpCode::Jump | OpCode::JumpIfFalse | OpCode::JumpIfTrue | OpCode::Loop => { // These require JumpOffset OpCode follow up
                 if op_index == self.code.len() - 1 {
                     panic!("{:?} must be followed by JumpOffset - {}", op_code, identifier);

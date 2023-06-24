@@ -308,8 +308,7 @@ impl<'a> Compiler<'a> {
             return;
         }
 
-        self.write_op_code(OpCode::DefineGlobal);
-        self.write_op_code(OpCode::Index(index));
+        self.write_op_code(OpCode::DefineGlobal(index));
     }
 
     fn statement(&mut self) {
@@ -517,16 +516,14 @@ impl<'a> Compiler<'a> {
         let value: f64 = self.previous_token.as_ref().unwrap().lexeme.parse().unwrap();
 
         let index = self.constants.write(SquatValue::Number(value));
-        self.write_op_code(OpCode::Constant);
-        self.write_op_code(OpCode::Index(index));
+        self.write_op_code(OpCode::Constant(index));
     }
 
     fn string(&mut self) {
         let value: String = self.previous_token.as_ref().unwrap().lexeme.clone();
 
         let index = self.constants.write(SquatValue::String(value));
-        self.write_op_code(OpCode::Constant);
-        self.write_op_code(OpCode::Index(index));
+        self.write_op_code(OpCode::Constant(index));
     }
 
     fn unary(&mut self) {
@@ -542,7 +539,6 @@ impl<'a> Compiler<'a> {
     }
 
     fn variable(&mut self) {
-        let arg: usize;
         let var_name = self.previous_token.as_ref().unwrap().lexeme.clone();
 
         let set_op_code: OpCode;
@@ -553,31 +549,25 @@ impl<'a> Compiler<'a> {
             return;
         }
 
-        if let Some(local_arg) = self.resolve_local(&var_name) {
-            arg = local_arg;
-
-            set_op_code = OpCode::SetLocal;
-            get_op_code = OpCode::GetLocal;
+        if let Some(index) = self.resolve_local(&var_name) {
+            set_op_code = OpCode::SetLocal(index);
+            get_op_code = OpCode::GetLocal(index);
         } else {
             if let Some(index) = self.global_variable_indicies.get(&var_name) {
-                arg = *index;
+                set_op_code = OpCode::SetGlobal(*index);
+                get_op_code = OpCode::GetGlobal(*index);
             } else {
                 self.compile_error(&format!("{} is not defined.", var_name));
                 return;
             }
-
-            set_op_code = OpCode::SetGlobal;
-            get_op_code = OpCode::GetGlobal;
         }
 
 
         if self.check_current(TokenType::Equal) {
             self.expression();
             self.write_op_code(set_op_code);
-            self.write_op_code(OpCode::Index(arg));
         } else {
             self.write_op_code(get_op_code);
-            self.write_op_code(OpCode::Index(arg));
         }
     }
 

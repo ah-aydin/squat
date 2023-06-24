@@ -124,15 +124,10 @@ impl VM {
 
             if let Some(instruction) = self.main_chunk.next() {
                 match instruction {
-                    OpCode::Constant => {
-                        if let Some(OpCode::Index(index)) = self.main_chunk.next() {
-                            let index = *index;
-                            let constant: &SquatValue = self.constants.get(index);
-                            self.stack.push(constant.clone()); // TODO figure out a way to get rid
-                                                               // of clone here
-                        } else {
-                            panic!("Constant OpCode must be followed by Index");
-                        }
+                    OpCode::Constant(index) => {
+                        let index = *index;
+                        let constant: &SquatValue = self.constants.get(index);
+                        self.stack.push(constant.clone());
                     },
 
                     OpCode::False=> self.stack.push(SquatValue::Bool(false)),
@@ -196,66 +191,45 @@ impl VM {
                         self.stack.pop();
                     },
 
-                    OpCode::DefineGlobal => {
-                        if let Some(OpCode::Index(index)) = self.main_chunk.next() {
-                            let index = *index;
-                            if let Some(value) = self.stack.pop() {
-                                //self.globals.insert(index, Some(value));
-                                self.globals[index] = Some(value);
-                            } else {
-                                panic!("DefineGlobal OpCode expects a value to be on the stack");
-                            }
+                    OpCode::DefineGlobal(index) => {
+                        let index = *index;
+                        if let Some(value) = self.stack.pop() {
+                            self.globals[index] = Some(value);
                         } else {
-                            panic!("DefineGlobal OpCode must be followed by Index OpCode");
+                            panic!("DefineGlobal OpCode expects a value to be on the stack");
                         }
                     },
-                    OpCode::GetGlobal => {
-                        if let Some(OpCode::Index(index)) = self.main_chunk.next() {
-                            let index = *index;
-                            if let Some(Some(value)) = self.globals.get(index) {
-                                self.stack.push(value.clone());
-                            } else {
-                                self.runtime_error(&format!("Variable with index {} is not defined", index));
-                            }
+                    OpCode::GetGlobal(index) => {
+                        let index = *index;
+                        if let Some(Some(value)) = self.globals.get(index) {
+                            self.stack.push(value.clone());
                         } else {
-                            panic!("GetGlobal OpCode must be followed by Index OpCode");
+                            self.runtime_error(&format!("Variable with index {} is not defined", index));
                         }
                     },
-                    OpCode::SetGlobal => {
-                        if let Some(OpCode::Index(index)) = self.main_chunk.next() {
-                            let index = *index;
-                            if let Some(value) = self.stack.last() {
-                                if let Some(Some(_value)) = self.globals.get(index) {
-                                    self.globals[index] = Some(value.clone());
-                                } else {
-                                    self.runtime_error(&format!("You cannot set a global variable before defining it"));
-                                }
+                    OpCode::SetGlobal(index) => {
+                        let index = *index;
+                        if let Some(value) = self.stack.last() {
+                            if let Some(Some(_value)) = self.globals.get(index) {
+                                self.globals[index] = Some(value.clone());
                             } else {
-                                panic!("SetGlobal OpCode expects a value to be on the stack");
+                                self.runtime_error(&format!("You cannot set a global variable before defining it"));
                             }
                         } else {
-                            panic!("SetGlobal OpCode must be followed by Index OpCode");
+                            panic!("SetGlobal OpCode expects a value to be on the stack");
                         }
                     },
 
-                    OpCode::GetLocal => {
-                        if let Some(OpCode::Index(index)) = self.main_chunk.next() {
-                            let index = index + self.call_stack.last().unwrap().stack_index;
-                            self.stack.push(self.stack[index].clone());
-                        } else {
-                            panic!("GetLocal OpCode must be followed by Index OpCode");
-                        }
+                    OpCode::GetLocal(index) => {
+                        let index = index + self.call_stack.last().unwrap().stack_index;
+                        self.stack.push(self.stack[index].clone());
                     },
-                    OpCode::SetLocal => {
-                        if let Some(OpCode::Index(index)) = self.main_chunk.next() {
-                            if let Some(value) = self.stack.last() {
-                                let index = index + self.call_stack.last().unwrap().stack_index;
-                                self.stack[index] = value.clone();
-                            } else {
-                                panic!("SetLocal OpCode expects a value to be on the stack");
-                            }
+                    OpCode::SetLocal(index) => {
+                        if let Some(value) = self.stack.last() {
+                            let index = index + self.call_stack.last().unwrap().stack_index;
+                            self.stack[index] = value.clone();
                         } else {
-                            panic!("SetLocal OpCode must be followed by Index OpCode");
+                            panic!("SetLocal OpCode expects a value to be on the stack");
                         }
                     },
 
