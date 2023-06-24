@@ -1,7 +1,5 @@
-use crate::value::{ValueArray, SquatValue};
 use crate::op_code::OpCode;
 
-#[cfg(debug_assertions)]
 use log::debug;
 
 #[derive(Debug, PartialEq)]
@@ -29,29 +27,19 @@ pub struct Chunk {
     code: Vec<OpCode>,
     pub current_instruction: usize,
     lines: Vec<Line>,
-    constants: ValueArray
 }
 
 impl Chunk {
-    pub fn new(name: String) -> Chunk {
+    pub fn new(name: &str) -> Chunk {
         Chunk {
-            name: String::from(&name) + " chunk",
+            name: String::from(name) + " Chunk",
             code: Vec::new(),
             current_instruction: 0,
             lines: Vec::new(),
-            constants: ValueArray::new(name + " constants")
         }
     }
 
-    pub fn add_constant(&mut self, value: SquatValue) -> usize {
-        self.constants.write(value)
-    }
-
-    pub fn read_constant(&self, index: usize) -> &SquatValue {
-        self.constants.get(index)
-    }
-
-    #[cfg(debug_assertions)]
+    #[cfg(feature="log_instructions")]
     pub fn disassemble(&self) {
         debug!("==== {} ====", self.name);
 
@@ -62,44 +50,20 @@ impl Chunk {
         }
     }
 
-    #[cfg(debug_assertions)]
     pub fn disassemble_current_instruction(&self) {
         let op_code = &self.code[self.current_instruction];
         self.disassemble_instruction(op_code, self.current_instruction);
     }
 
     pub fn get_current_instruction_line(&self) -> u32 {
-        self.get_line(self.current_instruction).unwrap()
+        self.get_line(self.current_instruction).unwrap_or(0)
     }
 
-    #[cfg(debug_assertions)]
     fn disassemble_instruction(&self, op_code: &OpCode, op_index: usize) -> usize  {
         // If this lines panics, there is something wrong with the implementation
-        let identifier = format!("{:04} {:04}", op_index, self.get_line(op_index).unwrap());
+        let identifier = format!("{:08} {:08}", op_index, self.get_line(op_index).unwrap());
 
         match op_code {
-            OpCode::Constant |
-                OpCode::DefineGlobal | OpCode::GetGlobal | OpCode::SetGlobal |
-                OpCode::GetLocal | OpCode::SetLocal => { // these require an Index OpCode follow up
-                    if op_index == self.code.len() - 1 {
-                        panic!("{:?} must be followed by Index - {}", op_code, identifier)
-                    } else if let OpCode::Index(_index) = self.code[op_index + 1] {
-                        debug!("{}: {:?} {:?}", identifier, op_code, &self.code[op_index + 1]);
-                        op_index + 2
-                    } else {
-                        panic!("{:?} must be followed by Index - {}", op_code, identifier)
-                    }
-                },
-            OpCode::Jump | OpCode::JumpIfFalse | OpCode::JumpIfTrue | OpCode::Loop => { // These require JumpOffset OpCode follow up
-                if op_index == self.code.len() - 1 {
-                    panic!("{:?} must be followed by JumpOffset - {}", op_code, identifier);
-                } else if let OpCode::JumpOffset(_offset) = self.code[op_index + 1] {
-                    debug!("{}: {:?} {:?}", identifier, op_code, &self.code[op_index + 1]);
-                    op_index + 2
-                } else {
-                    panic!("{:?} must be followed by Index - {}", op_code, identifier)
-                }
-            }
             _ => {
                 debug!("{}: {:?}", identifier, op_code);
                 op_index + 1
@@ -123,8 +87,10 @@ impl Chunk {
 
     pub fn set_jump_at(&mut self, location: usize, offset: usize) {
         match self.code[location] {
-            OpCode::JumpOffset(_) => self.code[location] = OpCode::JumpOffset(offset),
-            _ => panic!("Trying to modify instruction {:?} into {:?}", self.code[location], OpCode::JumpOffset(offset))
+            OpCode::JumpIfFalse(_) => self.code[location] = OpCode::JumpIfFalse(offset),
+            OpCode::Jump(_) => self.code[location] = OpCode::Jump(offset),
+            OpCode::JumpIfTrue(_) => self.code[location] = OpCode::JumpIfTrue(offset),
+            _ => panic!("Trying to modify instruction {:?} into a jump instruction", self.code[location])
         };
     }
 
@@ -145,12 +111,8 @@ impl Chunk {
         None
     }
 
-    pub fn reset(&mut self) {
-        self.current_instruction = 0;
-    }
-
-    pub fn write(&mut self, byte: OpCode, line: u32) {
-        self.code.push(byte);
+    pub fn write(&mut self, op_code: OpCode, line: u32) {
+        self.code.push(op_code);
         if let Some(last) = self.lines.last_mut() {
             if last.line == line {
                 last.increment();

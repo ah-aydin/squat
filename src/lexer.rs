@@ -575,4 +575,17 @@ mod test {
         assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Equal, "="));
         assert_eq!(lexer.scan_token(), Err(LexerError::IncompleteString { line: 1}));
     }
+
+    #[test]
+    fn function_body() {
+        let code = String::from("func main() { }");
+        let mut lexer = Lexer::new(&code);
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Func, "func"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Identifier, "main"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::LeftParenthesis, "("));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::RightParenthesis, ")"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::LeftBrace, "{"));
+        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::RightBrace, "}"));
+        assert_eq!(lexer.scan_token(), make_token(TokenType::Eof, "", 1));
+    }
 }

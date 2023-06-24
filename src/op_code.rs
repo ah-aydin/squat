@@ -1,7 +1,7 @@
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 #[repr(u8)]
 pub enum OpCode {
-    Constant, Index(usize),
+    Constant(usize),
     
     False, Nil, True,
 
@@ -17,10 +17,14 @@ pub enum OpCode {
 
     Print, Pop,
 
-    DefineGlobal, GetGlobal, SetGlobal,
-    GetLocal, SetLocal,
+    DefineGlobal(usize), GetGlobal(usize), SetGlobal(usize),
+    GetLocal(usize), SetLocal(usize),
 
-    JumpOffset(usize), JumpIfFalse, Jump, JumpIfTrue, Loop,
+    JumpTo(usize), JumpIfFalse(usize), Jump(usize), JumpIfTrue(usize),
+    Loop(usize),
 
-    Return
+    Call(usize, usize), // (Instruction, ArgCount)
+    Return,
+
+    Start, Stop
 }

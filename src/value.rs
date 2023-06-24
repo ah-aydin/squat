@@ -43,7 +43,7 @@ pub struct ValueArray {
 }
 
 impl ValueArray {
-    pub fn new(name: String) -> ValueArray {
+    pub fn new(name: &str) -> ValueArray {
         ValueArray {
             name: String::from(name),
             values: Vec::new()
