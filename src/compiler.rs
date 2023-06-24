@@ -41,7 +41,6 @@ impl std::ops::Add<u8> for Precedence {
 }
 
 pub enum CompileStatus {
-    // Contains starting instruction
     Success(usize, usize), // main_start, global_variable_count
     Fail
 }
@@ -124,7 +123,7 @@ impl<'a> Compiler<'a> {
 
         if !self.found_main {
             compile_status = CompileStatus::Fail;
-            println!("[COMPILE ERROR] Did not define the main function");
+            println!("[COMPILE ERROR] Function 'main' was not defined!");
         }
         if self.had_error {
             compile_status = CompileStatus::Fail;
@@ -269,7 +268,6 @@ impl<'a> Compiler<'a> {
     fn parse_variable(&mut self, error_msg: &str) -> Result<usize, ()> {
         self.consume_current(TokenType::Identifier, error_msg);
 
-        // Local variable
         if self.scope_depth > 0 {
             let name = self.previous_token.as_ref().unwrap().lexeme.clone();
             
@@ -310,7 +308,6 @@ impl<'a> Compiler<'a> {
     }
 
     fn define_variable(&mut self, index: usize) {
-        // Local variable
         if self.scope_depth > 0 {
             self.locals.last_mut().unwrap().depth = Some(self.scope_depth);
             return;
@@ -501,19 +498,19 @@ impl<'a> Compiler<'a> {
         self.parse_precedence(precedence + 1);
 
         match token_type {
-            TokenType::Plus =>          self.write_op_code(OpCode::Add),
-            TokenType::PlusPlus =>      self.write_op_code(OpCode::Concat),
-            TokenType::Minus =>         self.write_op_code(OpCode::Subtract),
-            TokenType::Star =>          self.write_op_code(OpCode::Multiply),
-            TokenType::Slash =>         self.write_op_code(OpCode::Divide),
-            TokenType::Percent =>       self.write_op_code(OpCode::Mod),
+            TokenType::Plus             => self.write_op_code(OpCode::Add),
+            TokenType::PlusPlus         => self.write_op_code(OpCode::Concat),
+            TokenType::Minus            => self.write_op_code(OpCode::Subtract),
+            TokenType::Star             => self.write_op_code(OpCode::Multiply),
+            TokenType::Slash            => self.write_op_code(OpCode::Divide),
+            TokenType::Percent          => self.write_op_code(OpCode::Mod),
 
-            TokenType::BangEqual =>     self.write_op_code(OpCode::NotEqual),
-            TokenType::EqualEqual =>    self.write_op_code(OpCode::Equal),
-            TokenType::Greater =>       self.write_op_code(OpCode::Greater),
-            TokenType::GreaterEqual =>  self.write_op_code(OpCode::GreaterEqual),
-            TokenType::Less =>          self.write_op_code(OpCode::Less),
-            TokenType::LessEqual =>     self.write_op_code(OpCode::LessEqual),
+            TokenType::BangEqual        => self.write_op_code(OpCode::NotEqual),
+            TokenType::EqualEqual       => self.write_op_code(OpCode::Equal),
+            TokenType::Greater          => self.write_op_code(OpCode::Greater),
+            TokenType::GreaterEqual     => self.write_op_code(OpCode::GreaterEqual),
+            TokenType::Less             => self.write_op_code(OpCode::Less),
+            TokenType::LessEqual        => self.write_op_code(OpCode::LessEqual),
 
             _ => panic!("Unreachable line")
         }
@@ -544,7 +541,7 @@ impl<'a> Compiler<'a> {
                 self.write_op_code(OpCode::Call(jump_index, arity));
             }
         } else {
-            panic!("There is no function name here.");
+            panic!("Unreachable line");
         }
     }
 
@@ -741,14 +738,14 @@ impl<'a> Compiler<'a> {
 
     fn call_prefix(&mut self, token_type: TokenType) {
         match token_type {
-            TokenType::LeftParenthesis => self.grouping(),
-            TokenType::Bang | TokenType::Minus => self.unary(),
-            TokenType::Number => self.number(),
+            TokenType::LeftParenthesis                          => self.grouping(),
+            TokenType::Bang | TokenType::Minus                  => self.unary(),
+            TokenType::Number                                   => self.number(),
             TokenType::False | TokenType::Nil | TokenType::True => self.literal(),
-            TokenType::String => self.string(),
-            TokenType::Identifier => self.variable(),
-            TokenType::Eof => return,
-            _ => self.compile_error("Incorrect statement")
+            TokenType::String                                   => self.string(),
+            TokenType::Identifier                               => self.variable(),
+            TokenType::Eof                                      => return,
+            _ => self.compile_error("This token is not siutable for an expression start")
         }
     }
 

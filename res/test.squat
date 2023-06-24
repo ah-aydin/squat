@@ -58,6 +58,8 @@ func main() {
         print i;
     }
 
+    print "Not true is " ++ !true;
+
     var e = printHelloThere();
     print e + 10;
     var a = 5;

@@ -18,6 +18,14 @@ impl SquatValue {
             SquatValue::Bool(false) => "false".to_owned(),
         }
     }
+
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            SquatValue::Bool(true) => true,
+            SquatValue::Bool(false) | SquatValue::Nil => false,
+            _ => true
+        }
+    }
 }
 
 impl PartialOrd for SquatValue {

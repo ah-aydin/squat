@@ -77,7 +77,7 @@ impl VM {
                 self.call_stack.push(CallFrame::new(0, 0));
 
                 // Add global initialization instruction to the end of the main_chunk
-                // and execute them first, before jumping into main()
+                // and execute them first, before jumping into main().
                 let starting_instruction = self.main_chunk.get_size();
                 while let Some(instruction) = self.global_var_decl_chunk.next() {
                     self.main_chunk.write(*instruction, self.global_var_decl_chunk.get_current_instruction_line());
@@ -130,15 +130,21 @@ impl VM {
                         self.stack.push(constant.clone());
                     },
 
-                    OpCode::False=> self.stack.push(SquatValue::Bool(false)),
-                    OpCode::Nil => self.stack.push(SquatValue::Nil),
-                    OpCode::True => self.stack.push(SquatValue::Bool(true)),
+                    OpCode::False           => self.stack.push(SquatValue::Bool(false)),
+                    OpCode::Nil             => self.stack.push(SquatValue::Nil),
+                    OpCode::True            => self.stack.push(SquatValue::Bool(true)),
 
-                    OpCode::Add => self.binary_op(|left, right| left + right),
-                    OpCode::Subtract => self.binary_op(|left, right| left - right),
-                    OpCode::Multiply => self.binary_op(|left, right| left * right),
-                    OpCode::Divide => self.binary_op(|left, right| left / right),
-                    OpCode::Mod => self.binary_op(|left, right| left % right),
+                    OpCode::Add             => self.binary_op(|left, right| left + right),
+                    OpCode::Subtract        => self.binary_op(|left, right| left - right),
+                    OpCode::Multiply        => self.binary_op(|left, right| left * right),
+                    OpCode::Divide          => self.binary_op(|left, right| left / right),
+                    OpCode::Mod             => self.binary_op(|left, right| left % right),
+                    OpCode::Equal           => self.binary_cmp(|left, right| left == right),
+                    OpCode::NotEqual        => self.binary_cmp(|left, right| left != right),
+                    OpCode::Greater         => self.binary_cmp(|left, right| left > right),
+                    OpCode::GreaterEqual    => self.binary_cmp(|left, right| left >= right),
+                    OpCode::Less            => self.binary_cmp(|left, right| left < right),
+                    OpCode::LessEqual       => self.binary_cmp(|left, right| left <= right),
 
                     OpCode::Concat => {
                         let right = self.stack.pop();
@@ -151,16 +157,10 @@ impl VM {
                         }
                     },
 
-                    OpCode::Equal => self.binary_cmp(|left, right| left == right),
-                    OpCode::NotEqual => self.binary_cmp(|left, right| left != right),
-                    OpCode::Greater => self.binary_cmp(|left, right| left > right),
-                    OpCode::GreaterEqual => self.binary_cmp(|left, right| left >= right),
-                    OpCode::Less => self.binary_cmp(|left, right| left < right),
-                    OpCode::LessEqual => self.binary_cmp(|left, right| left <= right),
 
                     OpCode::Not => {
                         if let Some(value) = self.stack.pop() {
-                            self.stack.push(SquatValue::Bool(!is_truthy(&value)));
+                            self.stack.push(SquatValue::Bool(!value.is_truthy()));
                         } else {
                             panic!("'!' cannot be used alone");
                         }
@@ -230,7 +230,7 @@ impl VM {
                     }
                     OpCode::JumpIfFalse(offset) => {
                         if let Some(value) = self.stack.last() {
-                            if !is_truthy(value) {
+                            if !value.is_truthy() {
                                 self.main_chunk.current_instruction += *offset;
                             }
                         } else {
@@ -242,7 +242,7 @@ impl VM {
                     },
                     OpCode::JumpIfTrue(offset) => {
                         if let Some(value) = self.stack.last() {
-                            if is_truthy(value) {
+                            if value.is_truthy() {
                                 self.main_chunk.current_instruction += *offset;
                             }
                         } else {
@@ -323,13 +323,5 @@ impl VM {
     fn runtime_error(&mut self, message: &str) {
         println!("[ERROR] (Line {}) {}", self.main_chunk.get_current_instruction_line(), message);
         self.had_error = true;
-    }
-}
-
-fn is_truthy(value: &SquatValue) -> bool {
-    match value {
-        SquatValue::Bool(true) => true,
-        SquatValue::Bool(false) | SquatValue::Nil => false,
-        _ => true
     }
 }
