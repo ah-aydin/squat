@@ -293,7 +293,7 @@ impl<'a> Compiler<'a> {
         }
 
         let var_name = self.previous_token.as_ref().unwrap().lexeme.clone();
-        if let Some(index) = self.global_variable_indicies.get(&var_name) {
+        if self.global_variable_indicies.get(&var_name).is_some() {
             self.compile_error(&format!("Variable {} is allready defined", var_name));
             return Err(());
         }

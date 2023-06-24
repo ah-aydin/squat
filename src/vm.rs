@@ -257,13 +257,6 @@ impl VM {
                             panic!("JumpIfTrue OpCode expect a value to be on the stack");
                         }
                     },
-                    OpCode::JumpBack => {
-                        if let Some(call_frame) = self.call_stack.pop() {
-                            self.main_chunk.current_instruction = call_frame.return_address;
-                        } else {
-                            panic!("JumpBack OpCode must contain a CallFrame in call_stack");
-                        }
-                    },
                     OpCode::Loop(loop_start) => {
                         self.main_chunk.current_instruction = *loop_start;
                     }
@@ -288,8 +281,6 @@ impl VM {
                     OpCode::Stop => {
                         return InterpretResult::InterpretOk;
                     }
-
-                    _ => panic!("Unsupported OpCode {:?}", instruction)
                 }
             } else {
                 break;
