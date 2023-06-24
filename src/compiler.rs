@@ -16,6 +16,7 @@ const INITIAL_LOCALS_VECTOR_SIZE: usize = 256;
 enum Precedence {
     None,
     Assignment,
+    Ternary,
     Or,
     And,
     Equality,
@@ -108,7 +109,7 @@ impl<'a> Compiler<'a> {
             panic_mode: false,
 
             main_start: 0,
-            found_main: false
+            found_main: false,
         }
     }
 
@@ -456,8 +457,27 @@ impl<'a> Compiler<'a> {
 
         while precedence <= self.get_precedence(self.current_token.as_ref().unwrap().token_type) {
             self.advance();
+
+            if self.check_previous(TokenType::Question) {
+                self.ternary();
+                continue;
+            }
             self.call_infix(self.previous_token.as_ref().unwrap().token_type);
         }
+    }
+
+    fn ternary(&mut self) {
+        let else_jump = self.emit_jump(OpCode::JumpIfFalse(usize::MAX));
+        self.write_op_code(OpCode::Pop);
+        self.parse_precedence(Precedence::Ternary + 1);
+
+        let end_jump = self.emit_jump(OpCode::Jump(usize::MAX));
+        self.patch_jump(else_jump);
+        self.write_op_code(OpCode::Pop);
+        self.consume_current(TokenType::Colon, "Expect ':' after true ternary block");
+
+        self.parse_precedence(Precedence::Ternary + 1);
+        self.patch_jump(end_jump);
     }
 
     fn and(&mut self) {
@@ -486,6 +506,7 @@ impl<'a> Compiler<'a> {
             TokenType::Minus =>         self.write_op_code(OpCode::Subtract),
             TokenType::Star =>          self.write_op_code(OpCode::Multiply),
             TokenType::Slash =>         self.write_op_code(OpCode::Divide),
+            TokenType::Percent =>       self.write_op_code(OpCode::Mod),
 
             TokenType::BangEqual =>     self.write_op_code(OpCode::NotEqual),
             TokenType::EqualEqual =>    self.write_op_code(OpCode::Equal),
@@ -650,18 +671,6 @@ impl<'a> Compiler<'a> {
         panic!("Unreachable line");
     }
 
-    fn consume_previous(&mut self, expected_type: TokenType, message: &str) {
-        if let Some(token) = &self.previous_token {
-            if token.token_type == expected_type {
-                return;
-            }
-            let lexeme = &self.previous_token.as_ref().unwrap().lexeme;
-            self.compile_error(&format!("Error at '{}': {}", lexeme, message));
-            return;
-        }
-        panic!("Unreachable line");
-    }
-
     fn check_current(&mut self, expected_type: TokenType) -> bool {
         if let Some(token) = &self.current_token {
             if token.token_type == expected_type {
@@ -670,6 +679,15 @@ impl<'a> Compiler<'a> {
             }
         }
         false
+    }
+
+    fn check_previous(&self, expected_type: TokenType) -> bool {
+        if let Some(token) = &self.previous_token {
+            if token.token_type == expected_type {
+                return true;
+            }
+        }
+        return false;
     }
 
     fn synchronize(&mut self) {
@@ -737,7 +755,7 @@ impl<'a> Compiler<'a> {
     fn call_infix(&mut self, token_type: TokenType) {
         match token_type {
             TokenType::Minus | TokenType::Plus | TokenType::Slash | TokenType::Star |
-                TokenType::PlusPlus |
+                TokenType::PlusPlus | TokenType::Percent |
                 TokenType::BangEqual | TokenType::EqualEqual |
                 TokenType::Greater | TokenType::GreaterEqual |
                 TokenType::Less | TokenType::LessEqual => self.binary(),
@@ -750,13 +768,15 @@ impl<'a> Compiler<'a> {
 
     fn get_precedence(&self, token_type: TokenType) -> Precedence {
         match token_type {
-            TokenType::Plus | TokenType::PlusPlus | TokenType::Minus => Precedence::Term,
-                TokenType::Star | TokenType::Slash => Precedence::Factor,
+            TokenType::Plus | TokenType::PlusPlus |
+                TokenType::Minus | TokenType::Percent => Precedence::Term,
+            TokenType::Star | TokenType::Slash => Precedence::Factor,
                 TokenType::BangEqual | TokenType::EqualEqual => Precedence::Equality,
             TokenType::Greater | TokenType::GreaterEqual |
                 TokenType::Less | TokenType::LessEqual => Precedence::Comparison,
             TokenType::And => Precedence::And,
             TokenType::Or => Precedence::Or,
+            TokenType::Question => Precedence::Ternary,
             TokenType::LeftParenthesis => Precedence::Call,
             _ => Precedence::None
         }

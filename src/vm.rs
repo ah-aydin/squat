@@ -138,22 +138,14 @@ impl VM {
                     OpCode::Subtract => self.binary_op(|left, right| left - right),
                     OpCode::Multiply => self.binary_op(|left, right| left * right),
                     OpCode::Divide => self.binary_op(|left, right| left / right),
+                    OpCode::Mod => self.binary_op(|left, right| left % right),
 
                     OpCode::Concat => {
                         let right = self.stack.pop();
                         let left = self.stack.pop();
 
                         if left.is_some() && right.is_some() {
-                            if let SquatValue::String(right) = right.unwrap() {
-                                if let SquatValue::String(left) = left.unwrap() {
-                                    self.stack.push(SquatValue::String(left + &right));
-                                } else {
-                                    self.runtime_error("Left operand is not a string");
-                                }
-                            }
-                            else {
-                                self.runtime_error("Right operand is not a string");
-                            }
+                            self.stack.push(SquatValue::String(left.unwrap().to_string() + &right.unwrap().to_string()));
                         } else {
                             panic!("Concat operation requires 2 values in the stack");
                         }
@@ -278,7 +270,7 @@ impl VM {
                             self.main_chunk.current_instruction = call_frame.return_address;
                             self.stack.push(return_val);
                         } else {
-                            panic!("JumpBack OpCode must contain a CallFrame in call_stack");
+                            panic!("Return OpCode must contain a CallFrame in call_stack");
                         }
                     },
 

@@ -67,6 +67,7 @@ impl<'a> Lexer<'a> {
                 ';' => Ok(self.make_token(TokenType::Semicolon)),
                 '/' => Ok(self.make_token(TokenType::Slash)),
                 '*' => Ok(self.make_token(TokenType::Star)),
+                '%' => Ok(self.make_token(TokenType::Percent)),
                 ':' => Ok(self.make_token(TokenType::Colon)),
                 '?' => Ok(self.make_token(TokenType::Question)),
 

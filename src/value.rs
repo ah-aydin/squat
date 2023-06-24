@@ -8,6 +8,18 @@ pub enum SquatValue {
     Bool(bool),
 }
 
+impl SquatValue {
+    pub fn to_string(&self) -> String {
+        match self {
+            SquatValue::Nil => String::from("nil"),
+            SquatValue::Number(value) => value.to_string(),
+            SquatValue::String(value) => value.clone(),
+            SquatValue::Bool(true) => "true".to_owned(),
+            SquatValue::Bool(false) => "false".to_owned(),
+        }
+    }
+}
+
 impl PartialOrd for SquatValue {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match (self, other) {

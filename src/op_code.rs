@@ -5,7 +5,7 @@ pub enum OpCode {
     
     False, Nil, True,
 
-    Add, Subtract, Multiply, Divide,
+    Add, Subtract, Multiply, Divide, Mod,
 
     Concat, 
 
