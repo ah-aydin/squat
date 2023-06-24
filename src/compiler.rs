@@ -228,7 +228,7 @@ impl<'a> Compiler<'a> {
             
             self.block();
             self.end_scope();
-            self.write_op_code(OpCode::JumpBack);
+            self.write_op_code(OpCode::Return);
         }
     }
 
@@ -427,7 +427,7 @@ impl<'a> Compiler<'a> {
     fn expression_statement(&mut self) {
         self.expression();
         self.consume_current(TokenType::Semicolon, "Expect ';' after expression");
-        self.write_op_code(OpCode::Pop)
+        self.write_op_code(OpCode::Pop);
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -483,11 +483,29 @@ impl<'a> Compiler<'a> {
     }
 
     fn call(&mut self) {
-        println!("function name {:?}", self.called_function);
         if let Some(func_name) = &self.called_function {
-            if let Some((jump_index, _arity)) = self.functions.get(func_name) {
-                self.write_op_code(OpCode::Call(*jump_index));
-                self.consume_current(TokenType::RightParenthesis, "Expec closing ')'");
+            if let Some((jump_index, arity)) = self.functions.get(func_name) {
+                let func_name = func_name.clone();
+                let jump_index = *jump_index;
+                let arity = *arity;
+
+                let mut arg_count = 0;
+                if !self.check_current(TokenType::RightParenthesis) {
+                    arg_count += 1;
+                    self.expression();
+
+                    while self.check_current(TokenType::Comma) {
+                        arg_count += 1;
+                        self.expression();
+                    }
+                    self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
+                }
+
+                if arg_count != arity {
+                    self.compile_error(&format!("{} requires {} arguments, but {} were given", func_name, arity, arg_count));
+                }
+
+                self.write_op_code(OpCode::Call(jump_index, arity));
             }
         } else {
             panic!("There is no function name here.");
@@ -733,9 +751,6 @@ impl<'a> Compiler<'a> {
 
     fn emit_loop(&mut self, loop_start: usize) {
         self.write_op_code(OpCode::Loop(loop_start));
-
-        // let offset = self.main_chunk.get_size() - loop_start + 1;
-        // self.write_op_code(OpCode::JumpOffset(offset));
     }
 
     //////////////////////////////////////////////////////////////////////////

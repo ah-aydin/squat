@@ -264,17 +264,24 @@ impl VM {
                             panic!("JumpBack OpCode must contain a CallFrame in call_stack");
                         }
                     },
-                    OpCode::Loop(offset) => {
-                        self.main_chunk.current_instruction = *offset;
+                    OpCode::Loop(loop_start) => {
+                        self.main_chunk.current_instruction = *loop_start;
                     }
 
-                    OpCode::Call(func_instruction_index) => {
+                    OpCode::Call(func_instruction_index, arity) => {
                         let func_instruction_index = *func_instruction_index;
+                        let arity = *arity;
+
                         let return_address = self.main_chunk.current_instruction + 1;
-                        self.call_stack.push(CallFrame::new(self.stack.len(), return_address));
+                        self.call_stack.push(CallFrame::new(self.stack.len() - arity, return_address));
                         self.main_chunk.current_instruction = func_instruction_index;
                     }
                     OpCode::Return => {
+                        if let Some(call_frame) = self.call_stack.pop() {
+                            self.main_chunk.current_instruction = call_frame.return_address;
+                        } else {
+                            panic!("JumpBack OpCode must contain a CallFrame in call_stack");
+                        }
                     },
 
                     OpCode::Start => {},
