@@ -240,7 +240,7 @@ impl VM {
                         if let Some(OpCode::JumpOffset(offset)) = self.main_chunk.next() {
                             if let Some(value) = self.stack.last() {
                                 if !is_truthy(value) {
-                                    self.main_chunk.current_instruction += offset.clone();
+                                    self.main_chunk.current_instruction += *offset;
                                 }
                             } else {
                                 panic!("JumpIfFalse OpCode expect a value to be on the stack");
@@ -251,7 +251,7 @@ impl VM {
                     },
                     OpCode::Jump => {
                         if let Some(OpCode::JumpOffset(offset)) = self.main_chunk.next() {
-                            self.main_chunk.current_instruction += offset.clone();
+                            self.main_chunk.current_instruction += *offset;
                         } else {
                             panic!("Jump OpCode must be followd by JumpOffset OpCode");
                         }
@@ -260,7 +260,7 @@ impl VM {
                         if let Some(OpCode::JumpOffset(offset)) = self.main_chunk.next() {
                             if let Some(value) = self.stack.last() {
                                 if is_truthy(value) {
-                                    self.main_chunk.current_instruction += offset.clone();
+                                    self.main_chunk.current_instruction += *offset;
                                 }
                             } else {
                                 panic!("JumpIfTrue OpCode expect a value to be on the stack");
@@ -278,7 +278,7 @@ impl VM {
                     },
                     OpCode::Loop => {
                         if let Some(OpCode::JumpOffset(offset)) = self.main_chunk.next() {
-                            self.main_chunk.current_instruction -= offset.clone();
+                            self.main_chunk.current_instruction -= *offset;
                         } else {
                             panic!("Loop OpCode must be followd by JumpOffset OpCode");
                         }

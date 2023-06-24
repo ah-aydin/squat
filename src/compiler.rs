@@ -721,7 +721,7 @@ impl<'a> Compiler<'a> {
     
     fn emit_jump(&mut self, op_code: OpCode) -> usize {
         self.write_op_code(op_code);
-        self.write_op_code(OpCode::JumpOffset(120));
+        self.write_op_code(OpCode::JumpOffset(usize::MAX));
         self.main_chunk.get_size() - 1
     }
 
