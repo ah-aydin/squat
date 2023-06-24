@@ -265,13 +265,18 @@ impl VM {
                         let func_instruction_index = *func_instruction_index;
                         let arity = *arity;
 
-                        let return_address = self.main_chunk.current_instruction + 1;
+                        let return_address = self.main_chunk.current_instruction;
                         self.call_stack.push(CallFrame::new(self.stack.len() - arity, return_address));
                         self.main_chunk.current_instruction = func_instruction_index;
                     }
                     OpCode::Return => {
                         if let Some(call_frame) = self.call_stack.pop() {
+                            let return_val = self.stack.pop().unwrap();
+                            while call_frame.stack_index < self.stack.len() {
+                                self.stack.pop();
+                            }
                             self.main_chunk.current_instruction = call_frame.return_address;
+                            self.stack.push(return_val);
                         } else {
                             panic!("JumpBack OpCode must contain a CallFrame in call_stack");
                         }

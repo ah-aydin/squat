@@ -10,14 +10,24 @@ func printHelloThere() {
     var g1 = "123123";
     var g2 = "12312312321";
     print g1 ++ g2;
+    return -88;
 }
 
 func exampleFunc(num1, num2) {
     print num1 + num2;
 }
 
+func rec(i) {
+    if (i <= 0) {
+        return;
+    }
+    print i;
+    rec(i-1);
+}
+
 func main() {
-    /*if (1 == 1) {
+    rec(10);
+    if (1 == 1) {
         print "hello there";
     } else {
         print "goodbye";
@@ -31,9 +41,10 @@ func main() {
     
     for (var i = 0; i < 10; i = i + 3) {
         print i;
-    }*/
+    }
 
-    printHelloThere();
+    var e = printHelloThere();
+    print e + 10;
     var a = 5;
     print a;
     exampleFunc(10, 90);

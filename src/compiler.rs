@@ -150,6 +150,8 @@ impl<'a> Compiler<'a> {
             self.function_declaration();
         } else if self.check_current(TokenType::Var) {
             self.var_declaration(true);
+        } else if self.check_current(TokenType::Return) {
+            self.compile_error("Cannot return from outside a function.");
         } else {
             self.compile_error("Statements are not allowed outside of function blocks.");
         }
@@ -166,6 +168,8 @@ impl<'a> Compiler<'a> {
             self.compile_error("You cannot define a function inside another function");
         } else if self.check_current(TokenType::Var) {
             self.var_declaration(false);
+        } else if self.check_current(TokenType::Return) {
+            self.return_statement();
         } else {
             self.statement();
         }
@@ -228,6 +232,7 @@ impl<'a> Compiler<'a> {
             
             self.block();
             self.end_scope();
+            self.write_op_code(OpCode::Nil);
             self.write_op_code(OpCode::Return);
         }
     }
@@ -311,6 +316,17 @@ impl<'a> Compiler<'a> {
         }
 
         self.write_op_code(OpCode::DefineGlobal(index));
+    }
+
+    fn return_statement(&mut self) {
+        if self.check_current(TokenType::Semicolon) {
+            self.write_op_code(OpCode::Nil);
+            self.write_op_code(OpCode::Return);
+            return;
+        }
+        self.expression();
+        self.consume_current(TokenType::Semicolon, "Expected ';' after return value");
+        self.write_op_code(OpCode::Return);
     }
 
     fn statement(&mut self) {
@@ -428,6 +444,7 @@ impl<'a> Compiler<'a> {
         self.expression();
         self.consume_current(TokenType::Semicolon, "Expect ';' after expression");
         self.write_op_code(OpCode::Pop);
+        println!("POPING IN FUNCTION {:?}", &self.called_function);
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -504,7 +521,6 @@ impl<'a> Compiler<'a> {
                 if arg_count != arity {
                     self.compile_error(&format!("{} requires {} arguments, but {} were given", func_name, arity, arg_count));
                 }
-
                 self.write_op_code(OpCode::Call(jump_index, arity));
             }
         } else {
@@ -635,6 +651,18 @@ impl<'a> Compiler<'a> {
         panic!("Unreachable line");
     }
 
+    fn consume_previous(&mut self, expected_type: TokenType, message: &str) {
+        if let Some(token) = &self.previous_token {
+            if token.token_type == expected_type {
+                return;
+            }
+            let lexeme = &self.previous_token.as_ref().unwrap().lexeme;
+            self.compile_error(&format!("Error at '{}': {}", lexeme, message));
+            return;
+        }
+        panic!("Unreachable line");
+    }
+
     fn check_current(&mut self, expected_type: TokenType) -> bool {
         if let Some(token) = &self.current_token {
             if token.token_type == expected_type {
@@ -703,7 +731,7 @@ impl<'a> Compiler<'a> {
             TokenType::String => self.string(),
             TokenType::Identifier => self.variable(),
             TokenType::Eof => return,
-            _ => panic!("No prefix is given for {:?}", token_type)
+            _ => self.compile_error("Incorrect statement")
         }
     }
 
