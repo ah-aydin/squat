@@ -66,7 +66,7 @@ impl VM {
         let interpret_result = match compiler.compile() {
             CompileStatus::Success(main_start, global_count) => {
                 drop(compiler);
-                #[cfg(feature = "log_instructions")]
+                #[cfg(debug_assertions)]
                 {
                     println!("---------------- INSTRUCTIONS ----------------");
                     self.global_var_decl_chunk.disassemble();
@@ -98,14 +98,14 @@ impl VM {
         self.main_chunk.current_instruction = starting_instruction;
 
         loop {
-            #[cfg(feature = "log_stack")]
+            #[cfg(debug_assertions)]
             {
                 debug!("STACK");
                 for value in self.stack.iter() {
                     debug!("[{:?}]", value);
                 }
             }
-            #[cfg(feature = "log_globals")]
+            #[cfg(debug_assertions)]
             {
                 debug!("GLOBALS");
                 for (index, value) in self.globals.iter().enumerate() {

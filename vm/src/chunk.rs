@@ -39,7 +39,7 @@ impl Chunk {
         }
     }
 
-    #[cfg(feature="log_instructions")]
+    #[cfg(debug_assertions)]
     pub fn disassemble(&self) {
         debug!("==== {} ====", self.name);
 
