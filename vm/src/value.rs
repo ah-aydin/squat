@@ -1,11 +1,32 @@
 use std::fmt;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
+pub struct SquatFunction {
+    name: String,
+    start_instruction_index: usize,
+    arity: usize
+}
+
+#[derive(Debug, Clone)]
+pub enum SquatObject {
+    Function(SquatFunction)
+}
+
+impl ToString for SquatObject {
+    fn to_string(&self) -> String {
+        match self {
+            SquatObject::Function(func) => format!("<fn {}>", func.name)
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum SquatValue {
     Nil,
     Number(f64),
     String(String),
     Bool(bool),
+    Object(SquatObject)
 }
 
 impl SquatValue {
@@ -16,6 +37,7 @@ impl SquatValue {
             SquatValue::String(value) => value.clone(),
             SquatValue::Bool(true) => "true".to_owned(),
             SquatValue::Bool(false) => "false".to_owned(),
+            SquatValue::Object(object) => object.to_string(),
         }
     }
 
@@ -24,6 +46,18 @@ impl SquatValue {
             SquatValue::Bool(true) => true,
             SquatValue::Bool(false) | SquatValue::Nil => false,
             _ => true
+        }
+    }
+}
+
+impl PartialEq for SquatValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (SquatValue::Nil, SquatValue::Nil) => true,
+            (SquatValue::Number(n1), SquatValue::Number(n2)) => n1 == n2,
+            (SquatValue::String(s1), SquatValue::String(s2)) => s1 == s2,
+            (SquatValue::Bool(b1), SquatValue::Bool(b2)) => b1 == b2,
+            _ => false
         }
     }
 }
@@ -45,7 +79,14 @@ impl fmt::Display for SquatValue {
             SquatValue::Nil             => write!(f, "Nil"),
             SquatValue::Number(value)   => write!(f, "{}", value),
             SquatValue::Bool(value)     => write!(f, "{}", value),
-            SquatValue::String(value)   => write!(f, "{}", value)
+            SquatValue::String(value)   => write!(f, "{}", value),
+            SquatValue::Object(object)  => {
+                match object {
+                    SquatObject::Function(func) => {
+                        write!(f, "<fn {}>", func.name)
+                    }
+                }
+            }
         }
     }
 }
