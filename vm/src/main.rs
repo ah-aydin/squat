@@ -12,7 +12,7 @@ use args::Options;
 use vm::{VM, InterpretResult};
 
 
-fn run_file(opts: &Options) {
+fn run_file(opts: &Options) -> Result<(),()> {
     let mut vm = VM::new();
 
     let source = match fs::read_to_string(&opts.file) {
@@ -25,17 +25,18 @@ fn run_file(opts: &Options) {
 
     if result == InterpretResult::InterpretCompileError {
         println!("CompileError");
+        return Err(());
     }
     if result == InterpretResult::InterpretRuntimeError {
         println!("RuntimeError");
+        return Err(());
     }
+    return Ok(());
 }
 
 fn main() -> Result<(), ()> {
     env_logger::init();
     let opts = Options::parse();
 
-    run_file(&opts);
-
-    Ok(())
+    run_file(&opts)
 }

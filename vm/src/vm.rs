@@ -4,7 +4,7 @@ use crate::{
     compiler::{
         Compiler,
         CompileStatus
-    }, value::{SquatValue, ValueArray}, args::Options
+    }, value::{SquatValue, ValueArray, SquatObject}, args::Options
 };
 
 const INITIAL_STACK_SIZE: usize = 256;
@@ -68,7 +68,6 @@ impl VM {
                 }
                 self.globals = vec![None; global_count];
                 self.call_stack.push(CallFrame::new(0, 0));
-
 
                 self.interpret_chunk(0, opts)
             },
@@ -235,22 +234,36 @@ impl VM {
                     },
                     OpCode::Loop(loop_start) => {
                         self.main_chunk.current_instruction = *loop_start;
-                    }
+                    },
 
-                    OpCode::Call(func_instruction_index, arity) => {
-                        let func_instruction_index = *func_instruction_index;
-                        let arity = *arity;
-
-                        let return_address = self.main_chunk.current_instruction;
-                        self.call_stack.push(CallFrame::new(self.stack.len() - arity, return_address));
-                        self.main_chunk.current_instruction = func_instruction_index;
-                    }
+                    OpCode::Call(arg_count) => {
+                        let arg_count = *arg_count;
+                        let func_data_location = self.stack.len() - 1 - arg_count;
+                        if let Some(SquatValue::Object(SquatObject::Function(func_data))) = self.stack.get(func_data_location) {
+                            if arg_count != func_data.arity {
+                                self.runtime_error(
+                                    &format!(
+                                        "Function takes {} arguments but {} were given",
+                                        func_data.arity,
+                                        arg_count
+                                    )
+                                );
+                                return InterpretResult::InterpretRuntimeError;
+                            }
+                            let return_address = self.main_chunk.current_instruction;
+                            self.call_stack.push(CallFrame::new(self.stack.len() - arg_count, return_address));
+                            self.main_chunk.current_instruction = func_data.start_instruction_index;
+                        } else {
+                            panic!("Call OpCode expects a SquatValue::Object(SquatObject::Function(SquatFunction)) value on the stack");
+                        }
+                    },
                     OpCode::Return => {
                         if let Some(call_frame) = self.call_stack.pop() {
                             let return_val = self.stack.pop().unwrap();
                             while call_frame.stack_index < self.stack.len() {
-                                self.stack.pop();
+                                self.stack.pop(); // Pop local variables
                             }
+                            self.stack.pop(); // Pop SquatFunc
                             self.main_chunk.current_instruction = call_frame.return_address;
                             self.stack.push(return_val);
                         } else {

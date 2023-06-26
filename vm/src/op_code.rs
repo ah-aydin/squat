@@ -23,8 +23,8 @@ pub enum OpCode {
     JumpTo(usize), JumpIfFalse(usize), Jump(usize), JumpIfTrue(usize),
     Loop(usize),
 
-    Call(usize, usize), // (Instruction, ArgCount)
+    Call(usize),
     Return,
 
-    Start, Stop
+    Start, Stop,
 }

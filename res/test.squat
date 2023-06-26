@@ -20,7 +20,7 @@ func rec(i) {
     if (i <= 0) {
         return;
     }
-    print i;
+    print "Rec " ++ rec ++ " " ++ i;
     rec(i-1);
 }
 
@@ -35,9 +35,18 @@ func is_even(number) {
     return number % 2 == 0;
 }
 
+func test_pass_func(fun) {
+    print test_pass_func;
+    print fun;
+    fun();
+    print fun;
+    print test_pass_func;
+}
+
 var global_var3 = 30;
 
 func main() {
+    test_pass_func(printHelloThere);
     for (var i = 0; i < 15; i = i + 1) {
         var odd = is_odd(i) ? "yes" : "no";
         print i ++ " is odd " ++ odd;
@@ -45,7 +54,11 @@ func main() {
         print i ++ " is even " ++ even;
     }
 
+    print rec;
     rec(10);
+
+    var rec2 = rec;
+    rec2(20);
 
     print "The number is " ++ 1230;
     if (1 == 1) {
@@ -63,6 +76,7 @@ func main() {
     for (var i = 0; i < 10; i = i + 3) {
         print i;
     }
+
 
     print "Not true is " ++ !true;
 

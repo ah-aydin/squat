@@ -4,7 +4,7 @@ use crate::chunk::Chunk;
 use crate::lexer::{Lexer, LexerError};
 use crate::op_code::OpCode;
 use crate::token::{TokenType, Token};
-use crate::value::{SquatValue, ValueArray};
+use crate::value::{SquatValue, ValueArray, SquatObject, SquatFunction};
 
 const INITIAL_LOCALS_VECTOR_SIZE: usize = 256;
 
@@ -42,11 +42,6 @@ pub enum CompileStatus {
     Fail
 }
 
-pub enum ChunkMode {
-    Main,
-    Global
-}
-
 struct Local {
     name: String,
     // If this value is missing, the variable is not initialized yet.
@@ -59,12 +54,10 @@ pub struct Compiler<'a> {
     current_token: Option<Token>,
 
     main_chunk: &'a mut Chunk,
-    chunk_mode: ChunkMode,
 
     global_variable_indicies: HashMap<String, usize>,
     constants: &'a mut ValueArray,
     functions: HashMap<String, (usize, usize)>, // (key, value) => (func_name, (start_index, arity))
-    called_function: Option<String>,
 
     locals: Vec<Local>,
     scope_depth: u32,
@@ -88,12 +81,10 @@ impl<'a> Compiler<'a> {
             current_token: None,
             
             main_chunk,
-            chunk_mode: ChunkMode::Main,
 
             global_variable_indicies: HashMap::new(),
             constants,
             functions: HashMap::new(),
-            called_function: None,
 
             locals: Vec::with_capacity(INITIAL_LOCALS_VECTOR_SIZE),
             scope_depth: 0,
@@ -144,7 +135,7 @@ impl<'a> Compiler<'a> {
         } else if self.check_current(TokenType::Func) {
             self.function_declaration();
         } else if self.check_current(TokenType::Var) {
-            self.var_declaration(true);
+            self.var_declaration();
         } else if self.check_current(TokenType::Return) {
             self.compile_error("Cannot return from outside a function.");
         } else {
@@ -162,7 +153,7 @@ impl<'a> Compiler<'a> {
         } else if self.check_current(TokenType::Func) {
             self.compile_error("You cannot define a function inside another function");
         } else if self.check_current(TokenType::Var) {
-            self.var_declaration(false);
+            self.var_declaration();
         } else if self.check_current(TokenType::Return) {
             self.return_statement();
         } else {
@@ -175,8 +166,16 @@ impl<'a> Compiler<'a> {
     }
 
     fn function_declaration(&mut self) {
-        self.consume_current(TokenType::Identifier, "Expected an identifier after 'func'");
+        //self.consume_current(TokenType::Identifier, "Expected an identifier after 'func'");
+        let index = match self.parse_variable("Expect variable name") {
+            Ok(value) => value,
+            Err(()) => {
+                return;
+            }
+        };
+
         let func_name = self.previous_token.as_ref().unwrap().lexeme.clone();
+        let constant_index;
 
         self.consume_current(TokenType::LeftParenthesis, "Expect '(' after function name.");
         if func_name == "main" {
@@ -194,10 +193,14 @@ impl<'a> Compiler<'a> {
             self.main_start = self.main_chunk.get_size();
 
             self.block();
-            self.write_op_code(OpCode::Stop);
 
             self.end_scope();
+            self.write_op_code(OpCode::Pop);
+            self.write_op_code(OpCode::Stop);
             self.patch_jump(jump);
+            
+            let function_obj = SquatObject::Function(SquatFunction::new(&func_name, self.main_start, 0));
+            constant_index = self.constants.write(SquatValue::Object(function_obj));
         } else {
             if self.functions.contains_key(&func_name) { // TODO consider adding function
                                                          // overloading
@@ -226,28 +229,30 @@ impl<'a> Compiler<'a> {
             self.consume_current(TokenType::LeftBrace, "Expected '{' to define function body");
 
             self.write_op_code(OpCode::Start);
-            self.functions.insert(func_name, (self.main_chunk.get_size() - 1, arity));
+            let starting_index = self.main_chunk.get_size() - 1;
+            self.functions.insert(func_name.clone(), (starting_index, arity));
             
             self.block();
             self.end_scope();
             self.write_op_code(OpCode::Nil);
             self.write_op_code(OpCode::Return);
             self.patch_jump(jump);
+
+            let function_obj = SquatObject::Function(SquatFunction::new(&func_name, starting_index, arity));
+            constant_index = self.constants.write(SquatValue::Object(function_obj));
         }
+
+        self.write_op_code(OpCode::Constant(constant_index));
+        self.define_variable(index);
     }
 
-    fn var_declaration(&mut self, global: bool) {
+    fn var_declaration(&mut self) {
         let index = match self.parse_variable("Expect variable name") {
             Ok(value) => value,
             Err(()) => {
                 return;
             }
         };
-
-
-        if global {
-            self.chunk_mode = ChunkMode::Global;
-        }
 
         if self.check_current(TokenType::Equal) {
             self.expression();
@@ -258,10 +263,6 @@ impl<'a> Compiler<'a> {
         self.consume_current(TokenType::Semicolon, "Expect ';' after variable declaration.");
 
         self.define_variable(index);
-
-        if global {
-            self.chunk_mode = ChunkMode::Main;
-        }
     }
 
     fn parse_variable(&mut self, error_msg: &str) -> Result<usize, ()> {
@@ -297,7 +298,7 @@ impl<'a> Compiler<'a> {
 
         let var_name = self.previous_token.as_ref().unwrap().lexeme.clone();
         if self.global_variable_indicies.get(&var_name).is_some() {
-            self.compile_error(&format!("Variable {} is allready defined", var_name));
+            self.compile_error(&format!("{} is allready defined", var_name));
             return Err(());
         }
 
@@ -390,7 +391,7 @@ impl<'a> Compiler<'a> {
 
         self.consume_current(TokenType::LeftParenthesis, "Expected '(' after 'for'");
         if self.check_current(TokenType::Var) {
-            self.var_declaration(false);
+            self.var_declaration();
         } else if !self.check_current(TokenType::Semicolon) {
             self.expression_statement();
         }
@@ -516,32 +517,19 @@ impl<'a> Compiler<'a> {
     }
 
     fn call(&mut self) {
-        if let Some(func_name) = &self.called_function {
-            if let Some((jump_index, arity)) = self.functions.get(func_name) {
-                let func_name = func_name.clone();
-                let jump_index = *jump_index;
-                let arity = *arity;
+        let mut arg_count = 0;
+        if !self.check_current(TokenType::RightParenthesis) {
+            arg_count += 1;
+            self.expression();
 
-                let mut arg_count = 0;
-                if !self.check_current(TokenType::RightParenthesis) {
-                    arg_count += 1;
-                    self.expression();
-
-                    while self.check_current(TokenType::Comma) {
-                        arg_count += 1;
-                        self.expression();
-                    }
-                    self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
-                }
-
-                if arg_count != arity {
-                    self.compile_error(&format!("{} requires {} arguments, but {} were given", func_name, arity, arg_count));
-                }
-                self.write_op_code(OpCode::Call(jump_index, arity));
+            while self.check_current(TokenType::Comma) {
+                arg_count += 1;
+                self.expression();
             }
-        } else {
-            panic!("Unreachable line");
+            self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
         }
+
+        self.write_op_code(OpCode::Call(arg_count));
     }
 
     fn expression(&mut self) {
@@ -596,11 +584,6 @@ impl<'a> Compiler<'a> {
         let set_op_code: OpCode;
         let get_op_code: OpCode;
 
-        if self.functions.contains_key(&var_name) {
-            self.called_function = Some(var_name);
-            return;
-        }
-
         if let Some(index) = self.resolve_local(&var_name) {
             set_op_code = OpCode::SetLocal(index);
             get_op_code = OpCode::GetLocal(index);
@@ -613,7 +596,6 @@ impl<'a> Compiler<'a> {
                 return;
             }
         }
-
 
         if self.check_current(TokenType::Equal) {
             self.expression();

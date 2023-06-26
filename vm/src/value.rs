@@ -30,7 +30,15 @@ impl ToString for SquatObject {
     }
 }
 
-#[derive(Debug, Clone)]
+impl PartialEq for SquatObject {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (SquatObject::Function(func1), SquatObject::Function(func2)) => func1.name == func2.name
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum SquatValue {
     Nil,
     Number(f64),
@@ -56,18 +64,6 @@ impl SquatValue {
             SquatValue::Bool(true) => true,
             SquatValue::Bool(false) | SquatValue::Nil => false,
             _ => true
-        }
-    }
-}
-
-impl PartialEq for SquatValue {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (SquatValue::Nil, SquatValue::Nil) => true,
-            (SquatValue::Number(n1), SquatValue::Number(n2)) => n1 == n2,
-            (SquatValue::String(s1), SquatValue::String(s2)) => s1 == s2,
-            (SquatValue::Bool(b1), SquatValue::Bool(b2)) => b1 == b2,
-            _ => false
         }
     }
 }
@@ -137,5 +133,24 @@ impl ValueArray {
         }
         self.values.push(value);
         self.values.len() - 1
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn not_equal_functions() {
+        let val1 = SquatValue::Object(SquatObject::Function(SquatFunction::new("func1", 0, 0)));
+        let val2 = SquatValue::Object(SquatObject::Function(SquatFunction::new("func2", 0, 0)));
+        assert_ne!(val1, val2);
+    }
+
+    #[test]
+    fn equal_functions() {
+        let val1 = SquatValue::Object(SquatObject::Function(SquatFunction::new("func1", 0, 0)));
+        let val2 = SquatValue::Object(SquatObject::Function(SquatFunction::new("func1", 0, 0)));
+        assert_eq!(val1, val2);
     }
 }
