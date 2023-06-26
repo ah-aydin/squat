@@ -2,9 +2,19 @@ use std::fmt;
 
 #[derive(Debug, Clone)]
 pub struct SquatFunction {
-    name: String,
-    start_instruction_index: usize,
-    arity: usize
+    pub name: String,
+    pub start_instruction_index: usize,
+    pub arity: usize
+}
+
+impl SquatFunction {
+    pub fn new(name: &str, start_instruction_index: usize, arity: usize) -> SquatFunction {
+        SquatFunction {
+            name: name.to_owned(),
+            start_instruction_index,
+            arity
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -38,7 +38,7 @@ impl std::ops::Add<u8> for Precedence {
 }
 
 pub enum CompileStatus {
-    Success(usize, usize), // main_start, global_variable_count
+    Success(usize), // global_variable_count
     Fail
 }
 
@@ -59,7 +59,6 @@ pub struct Compiler<'a> {
     current_token: Option<Token>,
 
     main_chunk: &'a mut Chunk,
-    global_var_decl_chunk: &'a mut Chunk,
     chunk_mode: ChunkMode,
 
     global_variable_indicies: HashMap<String, usize>,
@@ -81,7 +80,6 @@ impl<'a> Compiler<'a> {
     pub fn new(
         source: &'a String,
         main_chunk: &'a mut Chunk,
-        global_var_decl_chunk: &'a mut Chunk,
         constants: &'a mut ValueArray
     ) -> Compiler<'a> {
         Compiler {
@@ -90,7 +88,6 @@ impl<'a> Compiler<'a> {
             current_token: None,
             
             main_chunk,
-            global_var_decl_chunk,
             chunk_mode: ChunkMode::Main,
 
             global_variable_indicies: HashMap::new(),
@@ -115,8 +112,9 @@ impl<'a> Compiler<'a> {
         while !self.check_current(TokenType::Eof) {
             self.declaration_global();
         }
+        self.main_chunk.write(OpCode::JumpTo(self.main_start), 0);
 
-        let mut compile_status = CompileStatus::Success(self.main_start, self.global_variable_indicies.len());
+        let mut compile_status = CompileStatus::Success(self.global_variable_indicies.len());
 
         if !self.found_main {
             compile_status = CompileStatus::Fail;
@@ -191,6 +189,7 @@ impl<'a> Compiler<'a> {
             self.consume_current(TokenType::RightParenthesis, "Expect closing ')'. Function 'main' does not take arguments."); 
             self.consume_current(TokenType::LeftBrace, "Expected '{' to define function body");
 
+            let jump = self.emit_jump(OpCode::Jump(usize::MAX));
             self.write_op_code(OpCode::Start);
             self.main_start = self.main_chunk.get_size();
 
@@ -198,6 +197,7 @@ impl<'a> Compiler<'a> {
             self.write_op_code(OpCode::Stop);
 
             self.end_scope();
+            self.patch_jump(jump);
         } else {
             if self.functions.contains_key(&func_name) { // TODO consider adding function
                                                          // overloading
@@ -205,6 +205,7 @@ impl<'a> Compiler<'a> {
             }
             self.begin_scope();
 
+            let jump = self.emit_jump(OpCode::Jump(usize::MAX));
             let mut arity = 0;
             if !self.check_current(TokenType::RightParenthesis) {
                 arity += 1;
@@ -231,6 +232,7 @@ impl<'a> Compiler<'a> {
             self.end_scope();
             self.write_op_code(OpCode::Nil);
             self.write_op_code(OpCode::Return);
+            self.patch_jump(jump);
         }
     }
 
@@ -800,10 +802,12 @@ impl<'a> Compiler<'a> {
 
     fn write_op_code(&mut self, op_code: OpCode) {
         let line = self.previous_token.as_ref().unwrap().line;
-        match self.chunk_mode {
-            ChunkMode::Main => self.main_chunk.write(op_code, line),
-            ChunkMode::Global => self.global_var_decl_chunk.write(op_code, line)
-        };
+        self.main_chunk.write(op_code, line);
+        return;
+        // match self.chunk_mode {
+        //     ChunkMode::Main => self.main_chunk.write(op_code, line),
+        //     ChunkMode::Global => self.global_var_decl_chunk.write(op_code, line)
+        // };
     }
 
     //////////////////////////////////////////////////////////////////////////

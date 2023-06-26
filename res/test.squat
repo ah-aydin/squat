@@ -14,6 +14,8 @@ func exampleFunc(num1, num2) {
     return num1 + num2;
 }
 
+var global_var2 = 20;
+
 func rec(i) {
     if (i <= 0) {
         return;
@@ -32,6 +34,8 @@ func is_odd(number) {
 func is_even(number) {
     return number % 2 == 0;
 }
+
+var global_var3 = 30;
 
 func main() {
     for (var i = 0; i < 15; i = i + 1) {
@@ -77,3 +81,5 @@ func main() {
         print "a is 10";
     }
 }
+
+var global_var4 = 40;

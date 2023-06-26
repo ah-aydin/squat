@@ -37,7 +37,6 @@ pub struct VM {
     globals: Vec<Option<SquatValue>>,
     constants: ValueArray,
     main_chunk: Chunk,
-    global_var_decl_chunk: Chunk,
     had_error: bool
 }
 
@@ -49,7 +48,6 @@ impl VM {
             globals: vec![None; 1],
             constants: ValueArray::new("Constants"),
             main_chunk: Chunk::new("Main"),
-            global_var_decl_chunk: Chunk::new("Global Variable Decl"),
             had_error: false
         }
     }
@@ -58,30 +56,21 @@ impl VM {
         let mut compiler = Compiler::new(
             &source,
             &mut self.main_chunk,
-            &mut self.global_var_decl_chunk,
             &mut self.constants
         );
         let interpret_result = match compiler.compile() {
-            CompileStatus::Success(main_start, global_count) => {
+            CompileStatus::Success(global_count) => {
                 drop(compiler);
                 if opts.log_byte_code {
                     println!("---------------- INSTRUCTIONS ----------------");
-                    self.global_var_decl_chunk.disassemble();
                     self.main_chunk.disassemble();
                     println!("----------------------------------------------");
                 }
                 self.globals = vec![None; global_count];
                 self.call_stack.push(CallFrame::new(0, 0));
 
-                // Add global initialization instruction to the end of the main_chunk
-                // and execute them first, before jumping into main().
-                let starting_instruction = self.main_chunk.get_size();
-                while let Some(instruction) = self.global_var_decl_chunk.next() {
-                    self.main_chunk.write(*instruction, self.global_var_decl_chunk.get_current_instruction_line());
-                }
-                self.main_chunk.write(OpCode::JumpTo(main_start), 0);
 
-                self.interpret_chunk(starting_instruction, opts)
+                self.interpret_chunk(0, opts)
             },
             CompileStatus::Fail => InterpretResult::InterpretCompileError
         };
