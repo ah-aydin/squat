@@ -166,7 +166,6 @@ impl<'a> Compiler<'a> {
     }
 
     fn function_declaration(&mut self) {
-        //self.consume_current(TokenType::Identifier, "Expected an identifier after 'func'");
         let index = match self.parse_variable("Expect variable name") {
             Ok(value) => value,
             Err(()) => {
@@ -195,7 +194,6 @@ impl<'a> Compiler<'a> {
             self.block();
 
             self.end_scope();
-            self.write_op_code(OpCode::Pop);
             self.write_op_code(OpCode::Stop);
             self.patch_jump(jump);
             
