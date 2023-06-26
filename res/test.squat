@@ -14,11 +14,13 @@ func exampleFunc(num1, num2) {
     return num1 + num2;
 }
 
+var global_var2 = 20;
+
 func rec(i) {
     if (i <= 0) {
         return;
     }
-    print i;
+    print "Rec " ++ rec ++ " " ++ i;
     rec(i-1);
 }
 
@@ -33,7 +35,18 @@ func is_even(number) {
     return number % 2 == 0;
 }
 
+func test_pass_func(fun) {
+    print test_pass_func;
+    print fun;
+    fun();
+    print fun;
+    print test_pass_func;
+}
+
+var global_var3 = 30;
+
 func main() {
+    test_pass_func(printHelloThere);
     for (var i = 0; i < 15; i = i + 1) {
         var odd = is_odd(i) ? "yes" : "no";
         print i ++ " is odd " ++ odd;
@@ -41,8 +54,12 @@ func main() {
         print i ++ " is even " ++ even;
     }
 
-
+    print rec;
     rec(10);
+
+    var rec2 = rec;
+    rec2(20);
+
     print "The number is " ++ 1230;
     if (1 == 1) {
         print "hello there";
@@ -60,6 +77,7 @@ func main() {
         print i;
     }
 
+
     print "Not true is " ++ !true;
 
     var e = printHelloThere();
@@ -69,4 +87,13 @@ func main() {
     exampleFunc(exampleFunc(900, exampleFunc(80, 10)), 9);
     exampleFunc(a, 90);
     print a + 123123;
+
+    if (a == 5) {
+        print "a is 5";
+    }
+    if (a == 10) {
+        print "a is 10";
+    }
 }
+
+var global_var4 = 40;

@@ -1,11 +1,50 @@
 use std::fmt;
 
+#[derive(Debug, Clone)]
+pub struct SquatFunction {
+    pub name: String,
+    pub start_instruction_index: usize,
+    pub arity: usize
+}
+
+impl SquatFunction {
+    pub fn new(name: &str, start_instruction_index: usize, arity: usize) -> SquatFunction {
+        SquatFunction {
+            name: name.to_owned(),
+            start_instruction_index,
+            arity
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum SquatObject {
+    Function(SquatFunction)
+}
+
+impl ToString for SquatObject {
+    fn to_string(&self) -> String {
+        match self {
+            SquatObject::Function(func) => format!("<fn {}>", func.name)
+        }
+    }
+}
+
+impl PartialEq for SquatObject {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (SquatObject::Function(func1), SquatObject::Function(func2)) => func1.name == func2.name
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum SquatValue {
     Nil,
     Number(f64),
     String(String),
     Bool(bool),
+    Object(SquatObject)
 }
 
 impl SquatValue {
@@ -16,6 +55,7 @@ impl SquatValue {
             SquatValue::String(value) => value.clone(),
             SquatValue::Bool(true) => "true".to_owned(),
             SquatValue::Bool(false) => "false".to_owned(),
+            SquatValue::Object(object) => object.to_string(),
         }
     }
 
@@ -45,7 +85,14 @@ impl fmt::Display for SquatValue {
             SquatValue::Nil             => write!(f, "Nil"),
             SquatValue::Number(value)   => write!(f, "{}", value),
             SquatValue::Bool(value)     => write!(f, "{}", value),
-            SquatValue::String(value)   => write!(f, "{}", value)
+            SquatValue::String(value)   => write!(f, "{}", value),
+            SquatValue::Object(object)  => {
+                match object {
+                    SquatObject::Function(func) => {
+                        write!(f, "<fn {}>", func.name)
+                    }
+                }
+            }
         }
     }
 }
@@ -86,5 +133,24 @@ impl ValueArray {
         }
         self.values.push(value);
         self.values.len() - 1
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn not_equal_functions() {
+        let val1 = SquatValue::Object(SquatObject::Function(SquatFunction::new("func1", 0, 0)));
+        let val2 = SquatValue::Object(SquatObject::Function(SquatFunction::new("func2", 0, 0)));
+        assert_ne!(val1, val2);
+    }
+
+    #[test]
+    fn equal_functions() {
+        let val1 = SquatValue::Object(SquatObject::Function(SquatFunction::new("func1", 0, 0)));
+        let val2 = SquatValue::Object(SquatObject::Function(SquatFunction::new("func1", 0, 0)));
+        assert_eq!(val1, val2);
     }
 }
