@@ -7,17 +7,17 @@ mod value;
 mod vm;
 
 use std::{env, fs};
-use log::{debug, error, info};
+use log::{debug, error};
 use vm::{VM, InterpretResult};
 
 fn run_file(file: &String) {
     let mut vm = VM::new();
 
-    info!("Reading file: {}", file);
     let source = match fs::read_to_string(&file) {
         Ok(contents) => contents,
         _ => panic!("Failed to read file '{}'", file)
     };
+    println!("Compiling and running file: {}", file);
 
     let result = vm.interpret_source(source);
 
