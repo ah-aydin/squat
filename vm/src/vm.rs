@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{
     chunk::Chunk,
     op_code::OpCode,
@@ -20,14 +22,16 @@ pub enum InterpretResult {
 
 struct CallFrame {
     stack_index: usize,
-    return_address: usize
+    return_address: usize,
+    func_name: String
 }
 
 impl CallFrame {
-    fn new(stack_index: usize, return_address: usize) -> CallFrame {
+    fn new(stack_index: usize, return_address: usize, func_name: String) -> CallFrame {
         CallFrame {
             stack_index,
-            return_address
+            return_address,
+            func_name
         }
     }
 }
@@ -68,7 +72,7 @@ impl VM {
                     println!("----------------------------------------------");
                 }
                 self.globals = vec![None; global_count];
-                self.call_stack.push(CallFrame::new(0, 0));
+                self.call_stack.push(CallFrame::new(0, self.main_chunk.get_main_start(), "main".to_owned()));
 
                 self.interpret_chunk(0, opts)
             },
@@ -252,7 +256,7 @@ impl VM {
                                 return InterpretResult::InterpretRuntimeError;
                             }
                             let return_address = self.main_chunk.current_instruction;
-                            self.call_stack.push(CallFrame::new(self.stack.len() - arg_count, return_address));
+                            self.call_stack.push(CallFrame::new(self.stack.len() - arg_count, return_address, func_data.name.clone()));
                             self.main_chunk.current_instruction = func_data.start_instruction_index;
                         } else {
                             panic!("Call OpCode expects a SquatValue::Object(SquatObject::Function(SquatFunction)) value on the stack");
@@ -319,6 +323,16 @@ impl VM {
     }
 
     fn runtime_error(&mut self, message: &str) {
+        println!("Error callstack:");
+        for call_frame in self.call_stack.iter().rev() {
+            // let line;
+            // if call_frame.func_name == "main" {
+            //     line = self.main_chunk.get_main
+            // } else {
+            //     line = self.main_chunk.get_instruction_line(call_frame.return_address);
+            // }
+            println!("\tfunction '{}' called at line {}", call_frame.func_name, self.main_chunk.get_instruction_line(call_frame.return_address));
+        }
         println!("[ERROR] (Line {}) {}", self.main_chunk.get_current_instruction_line(), message);
         self.had_error = true;
     }

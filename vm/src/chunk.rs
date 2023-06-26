@@ -52,8 +52,19 @@ impl Chunk {
         self.disassemble_instruction(op_code, self.current_instruction);
     }
 
+    pub fn get_instruction_line(&self, instruction: usize) -> u32 {
+        self.get_line(instruction).unwrap_or(0)
+    }
+
     pub fn get_current_instruction_line(&self) -> u32 {
         self.get_line(self.current_instruction).unwrap_or(0)
+    }
+
+    pub fn get_main_start(&self) -> usize {
+        if let OpCode::JumpTo(main_start) = self.code.last().unwrap() {
+            return *main_start - 1;
+        }
+        unreachable!()
     }
 
     fn disassemble_instruction(&self, op_code: &OpCode, op_index: usize) -> usize  {

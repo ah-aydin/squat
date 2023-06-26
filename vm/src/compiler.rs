@@ -510,7 +510,7 @@ impl<'a> Compiler<'a> {
             TokenType::Less             => self.write_op_code(OpCode::Less),
             TokenType::LessEqual        => self.write_op_code(OpCode::LessEqual),
 
-            _ => panic!("Unreachable line")
+            _ => unreachable!()
         }
     }
 
@@ -546,7 +546,7 @@ impl<'a> Compiler<'a> {
             TokenType::False => self.write_op_code(OpCode::False),
             TokenType::Nil => self.write_op_code(OpCode::Nil),
             TokenType::True => self.write_op_code(OpCode::True),
-            _ => panic!("Unreachable line")
+            _ => unreachable!()
         }
     }
 
@@ -572,7 +572,7 @@ impl<'a> Compiler<'a> {
         match token_type {
             TokenType::Bang => self.write_op_code(OpCode::Not),
             TokenType::Minus => self.write_op_code(OpCode::Negate),
-            _ => panic!("Unreachable line")
+            _ => unreachable!()
         }
     }
 
@@ -644,7 +644,7 @@ impl<'a> Compiler<'a> {
             self.compile_error(&format!("Error at '{}': {}", lexeme, message));
             return;
         }
-        panic!("Unreachable line");
+        unreachable!();
     }
 
     fn check_current(&mut self, expected_type: TokenType) -> bool {
