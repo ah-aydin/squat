@@ -111,71 +111,59 @@ fn parse_cmd_args_derive2(item: proc_macro2::TokenStream) -> deluxe::Result<proc
     // extract field attributes
     let field_attrs: BTreeMap<String, ArgData> = extract_arg_field_attrs(&mut ast)?;
 
-    // Destructure the map
+    // Destructure the map and build debug strings
     let mut field_names = Vec::new();
     let mut short_commands= Vec::new();
     let mut long_commands = Vec::new();
-    let mut descriptions = Vec::new();
-    let mut args = Vec::new();
     let mut required = Vec::new();
     let mut has_parameter = Vec::new();
+
+    let mut usage_str = String::from("Usage: squat [OPTIONS]");
+    let mut options_str = String::from("");
+
     for (field, attr) in field_attrs {
-        field_names.push(field);
+        let short = attr.short.clone();
+        let long;
+        let req = attr.required;
+        let description;
 
-        short_commands.push(attr.short.clone());
-        args.push(attr.short);
+        field_names.push(field.clone());
 
-        required.push(attr.required);
+        short_commands.push(short.clone());
+
+        required.push(req);
         has_parameter.push(attr.has_parameter);
 
         if let Some(val) = attr.long {
+            long = val.clone();
             long_commands.push(val.clone());
-            args.push(val);
         } else {
+            long = "".to_owned();
             long_commands.push("".to_owned());
         }
 
         if let Some(val) = attr.description {
-            descriptions.push(Some(val));
-        } else {
-            descriptions.push(None);
-        }
-    }
-    let options_count = field_names.len();
-
-    // Build debug strings
-    let mut usage_str = String::from("Usage: squat [OPTIONS]");
-    let mut options_str = String::from("\n");
-    for i in 0..(required.len()) {
-        let short = short_commands[i].clone();
-        let long = long_commands[i].clone();
-        let required = required[i];
-
-        if required {
-            usage_str += &format!(" {} {}", short, field_names[i]);
-        }
-
-
-        let description;
-        if let Some(value) = &descriptions[i] {
-            description = value.clone();
+            description = val;
         } else {
             description = "".to_owned();
         }
 
+        if req {
+            usage_str += &format!(" {} {}", short, field);
+        }
         let parameter;
-        if has_parameter[i] {
-            parameter = format!("<{}>", field_names[i].clone().to_uppercase());
+        if attr.has_parameter {
+            parameter = format!("<{}>", field.to_uppercase());
         } else {
             parameter = "".to_owned();
         }
-
         options_str += &format!("   {:03} {:20} {:20} {}", short, long, parameter, description);
-        if required {
+        if req {
             options_str += " (Required)";
         }
         options_str += "\n";
     }
+    let options_count = field_names.len();
 
     let ident = &ast.ident;
     let (impl_generics, type_generics, where_clause) = ast.generics.split_for_impl();
@@ -188,19 +176,20 @@ fn parse_cmd_args_derive2(item: proc_macro2::TokenStream) -> deluxe::Result<proc
         build_match_arms(index, value, &field_names[index], has_parameter[index])
     });
 
-    Ok(quote! {
+    let code = quote! {
         impl #impl_generics #ident #type_generics #where_clause {
             fn parse() -> #ident {
                 fn error(msg: &str) {
                     println!("{}", msg);
                     println!("{}", #usage_str);
-                    println!("Options:");
+                    println!("\nOptions:");
                     println!("{}", #options_str);
                     std::process::exit(1);
                 }
 
                 let mut return_struct: #ident = Default::default();
                 let mut processed = vec![false; #options_count];
+                let mut required = vec![#(#required),*];
                 let mut args: Vec<String> = std::env::args().collect();
 
                 args.remove(0);
@@ -218,11 +207,19 @@ fn parse_cmd_args_derive2(item: proc_macro2::TokenStream) -> deluxe::Result<proc
                     };
                     i += 1;
                 }
+                
+                for i in 0..#options_count {
+                    if required[i] && !processed[i] {
+                        error(&format!("[ERROR] not all required options have been provided."));
+                    }
+                }
 
                 return_struct
             }
         }
-    })
+    };
+
+    Ok(code)
 }
 
 #[proc_macro_derive(CmdArgs, attributes(metadata, arg))]
