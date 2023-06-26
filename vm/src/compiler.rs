@@ -6,9 +6,6 @@ use crate::op_code::OpCode;
 use crate::token::{TokenType, Token};
 use crate::value::{SquatValue, ValueArray};
 
-#[cfg(debug_assertions)]
-use log::debug;
-
 const INITIAL_LOCALS_VECTOR_SIZE: usize = 256;
 
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
@@ -130,11 +127,11 @@ impl<'a> Compiler<'a> {
         }
 
         #[cfg(debug_assertions)]
-        debug!("Global variable indicies {:?}", self.global_variable_indicies);
+        println!("Global variable indicies {:?}", self.global_variable_indicies);
         #[cfg(debug_assertions)]
-        debug!("Functions {:?}", self.functions);
+        println!("Functions {:?}", self.functions);
         #[cfg(debug_assertions)]
-        debug!("Constants {:?}", self.constants);
+        println!("Constants {:?}", self.constants);
 
         compile_status
     }

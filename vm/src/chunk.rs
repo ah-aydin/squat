@@ -1,7 +1,5 @@
 use crate::op_code::OpCode;
 
-use log::debug;
-
 #[derive(Debug, PartialEq)]
 struct Line {
     line: u32,
@@ -39,9 +37,8 @@ impl Chunk {
         }
     }
 
-    #[cfg(debug_assertions)]
     pub fn disassemble(&self) {
-        debug!("==== {} ====", self.name);
+        println!("==== {} ====", self.name);
 
         let mut op_index: usize = 0;
         while op_index < self.code.len() {
@@ -65,7 +62,7 @@ impl Chunk {
 
         match op_code {
             _ => {
-                debug!("{}: {:?}", identifier, op_code);
+                println!("{}: {:?}", identifier, op_code);
                 op_index + 1
             }
         }
@@ -92,10 +89,6 @@ impl Chunk {
             OpCode::JumpIfTrue(_) => self.code[location] = OpCode::JumpIfTrue(offset),
             _ => panic!("Trying to modify instruction {:?} into a jump instruction", self.code[location])
         };
-    }
-
-    pub fn get_name(&self) -> String {
-        self.name.clone()
     }
 
     pub fn get_size(&self) -> usize {

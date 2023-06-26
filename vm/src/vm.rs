@@ -4,10 +4,8 @@ use crate::{
     compiler::{
         Compiler,
         CompileStatus
-    }, value::{SquatValue, ValueArray}
+    }, value::{SquatValue, ValueArray}, args::Options
 };
-
-use log::debug;
 
 const INITIAL_STACK_SIZE: usize = 256;
 const INITIAL_CALL_STACK_SIZE: usize = 256;
@@ -56,7 +54,7 @@ impl VM {
         }
     }
 
-    pub fn interpret_source(&mut self, source: String) -> InterpretResult {
+    pub fn interpret_source(&mut self, source: String, opts: &Options) -> InterpretResult {
         let mut compiler = Compiler::new(
             &source,
             &mut self.main_chunk,
@@ -66,8 +64,7 @@ impl VM {
         let interpret_result = match compiler.compile() {
             CompileStatus::Success(main_start, global_count) => {
                 drop(compiler);
-                #[cfg(debug_assertions)]
-                {
+                if opts.log_byte_code {
                     println!("---------------- INSTRUCTIONS ----------------");
                     self.global_var_decl_chunk.disassemble();
                     self.main_chunk.disassemble();
@@ -84,7 +81,7 @@ impl VM {
                 }
                 self.main_chunk.write(OpCode::JumpTo(main_start), 0);
 
-                self.interpret_chunk(starting_instruction)
+                self.interpret_chunk(starting_instruction, opts)
             },
             CompileStatus::Fail => InterpretResult::InterpretCompileError
         };
@@ -93,30 +90,28 @@ impl VM {
         interpret_result
     }
 
-    fn interpret_chunk(&mut self, starting_instruction: usize) -> InterpretResult {
-        debug!("==== Interpret Chunk {} ====", self.main_chunk.get_name());
+    fn interpret_chunk(&mut self, starting_instruction: usize, opts: &Options) -> InterpretResult {
         self.main_chunk.current_instruction = starting_instruction;
 
         loop {
-            #[cfg(debug_assertions)]
-            {
-                debug!("STACK");
+            if opts.log_stack {
+                println!("STACK");
                 for value in self.stack.iter() {
-                    debug!("[{:?}]", value);
+                    println!("\t[{:?}]", value);
                 }
             }
-            #[cfg(debug_assertions)]
-            {
-                debug!("GLOBALS");
+            if opts.log_globals {
+                println!("GLOBALS:");
                 for (index, value) in self.globals.iter().enumerate() {
                     if let Some(value) = value {
-                        debug!("({}: {:?})", index, value);
+                        println!("\t({}: {:?})", index, value);
                     }
                 }
             }
 
-            #[cfg(debug_assertions)]
-            self.main_chunk.disassemble_current_instruction();
+            if opts.log_insturctions {
+                self.main_chunk.disassemble_current_instruction();
+            }
 
             if self.had_error {
                 return InterpretResult::InterpretRuntimeError;

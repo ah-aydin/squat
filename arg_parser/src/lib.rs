@@ -178,7 +178,7 @@ fn parse_cmd_args_derive2(item: proc_macro2::TokenStream) -> deluxe::Result<proc
 
     let code = quote! {
         impl #impl_generics #ident #type_generics #where_clause {
-            fn parse() -> #ident {
+            pub fn parse() -> #ident {
                 fn error(msg: &str) {
                     println!("{}", msg);
                     println!("{}", #usage_str);

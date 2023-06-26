@@ -1,3 +1,4 @@
+mod args;
 mod chunk;
 mod compiler;
 mod lexer;
@@ -7,37 +8,20 @@ mod value;
 mod vm;
 
 use std::fs;
-use arg_parser::CmdArgs;
+use args::Options;
 use vm::{VM, InterpretResult};
 
-#[derive(CmdArgs, Debug, Default)]
-struct Args {
-    #[arg(short="-f", long="--file", description="The file to compile", required=true)]
-    file: String,
 
-    #[arg(short="-c", long="--code", description="Log byte code after compilation")]
-    log_byte_code: bool,
-
-    #[arg(short="-g", long="--globals", description="Log global variable indicies")]
-    log_globals: bool,
-
-    #[arg(short="-i", long="--instructions", description="Log each instruction before execution")]
-    log_insturctions: bool,
-
-    #[arg(short="-s", long="--stack", description="Log the stack of the program before each instruction")]
-    log_stack: bool,
-}
-
-fn run_file(file: &String) {
+fn run_file(opts: &Options) {
     let mut vm = VM::new();
 
-    let source = match fs::read_to_string(&file) {
+    let source = match fs::read_to_string(&opts.file) {
         Ok(contents) => contents,
-        _ => panic!("Failed to read file '{}'", file)
+        _ => panic!("Failed to read file '{}'", opts.file)
     };
-    println!("Compiling and running file: {}", file);
+    println!("Compiling and running file: {}", opts.file);
 
-    let result = vm.interpret_source(source);
+    let result = vm.interpret_source(source, opts);
 
     if result == InterpretResult::InterpretCompileError {
         println!("CompileError");
@@ -47,13 +31,11 @@ fn run_file(file: &String) {
     }
 }
 
-
-
 fn main() -> Result<(), ()> {
     env_logger::init();
-    let args = Args::parse();
+    let opts = Options::parse();
 
-    run_file(&args.file);
+    run_file(&opts);
 
     Ok(())
 }
