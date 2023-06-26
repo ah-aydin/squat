@@ -7,8 +7,15 @@ use quote::{quote, format_ident};
 use syn::{self, DeriveInput, Type};
 
 #[derive(deluxe::ExtractAttributes, Debug)]
+#[deluxe(attributes(metadata))]
+struct MetaDataDefinition {
+    #[deluxe(default = String::from(""))]
+    description: String,
+}
+
+#[derive(deluxe::ExtractAttributes, Debug)]
 #[deluxe(attributes(arg))]
-struct ArgAttributes {
+struct ArgDefinition {
     short: String,
 
     #[deluxe(default = String::from(""))]
@@ -30,7 +37,7 @@ struct ArgData {
 }
 
 impl ArgData {
-    fn from_arg_attribs(attrs: ArgAttributes, has_parameter: bool) -> ArgData {
+    fn from_arg_attribs(attrs: ArgDefinition, has_parameter: bool) -> ArgData {
         ArgData {
             short: attrs.short,
             long: match attrs.long.len() {
@@ -64,7 +71,7 @@ fn extract_arg_field_attrs(ast: &mut DeriveInput) -> deluxe::Result<BTreeMap<Str
     if let syn::Data::Struct(s) = &mut ast.data {
         for field in s.fields.iter_mut() {
             let field_name = field.ident.as_ref().unwrap().to_string();
-            let attrs: ArgAttributes = deluxe::extract_attributes(field)?;
+            let attrs: ArgDefinition = deluxe::extract_attributes(field)?;
             field_attrs.insert(field_name, ArgData::from_arg_attribs(attrs, !is_bool(&field.ty)));
         }
     } else {
@@ -107,6 +114,7 @@ fn build_match_arms(index: usize, value: &str, field_name: &String, has_paramete
 fn parse_cmd_args_derive2(item: proc_macro2::TokenStream) -> deluxe::Result<proc_macro2::TokenStream> {
     // parse
     let mut ast: DeriveInput = syn::parse2(item)?;
+    let meta_data: MetaDataDefinition = deluxe::extract_attributes(&mut ast)?;
 
     // extract field attributes
     let field_attrs: BTreeMap<String, ArgData> = extract_arg_field_attrs(&mut ast)?;
@@ -118,7 +126,7 @@ fn parse_cmd_args_derive2(item: proc_macro2::TokenStream) -> deluxe::Result<proc
     let mut required = Vec::new();
     let mut has_parameter = Vec::new();
 
-    let mut usage_str = String::from("Usage: squat [OPTIONS]");
+    let mut usage_str = String::from("Usage: EXEC_NAME [OPTIONS]");
     let mut options_str = String::from("");
 
     for (field, attr) in field_attrs {
@@ -163,6 +171,12 @@ fn parse_cmd_args_derive2(item: proc_macro2::TokenStream) -> deluxe::Result<proc
         }
         options_str += "\n";
     }
+    options_str += &format!("   {:03} {:20} {:20} {}", "-h", "--help", "", "Displays help");
+
+    if meta_data.description.len() > 0 {
+        usage_str += &format!("\n\n{}", &meta_data.description);
+    }
+
     let options_count = field_names.len();
 
     let ident = &ast.ident;
@@ -181,7 +195,23 @@ fn parse_cmd_args_derive2(item: proc_macro2::TokenStream) -> deluxe::Result<proc
             pub fn parse() -> #ident {
                 fn error(msg: &str) {
                     println!("{}", msg);
-                    println!("{}", #usage_str);
+                    print_help();
+                }
+
+                fn print_help() {
+                    let mut usage_str = String::from(#usage_str);
+                    usage_str = usage_str
+                        .replace(
+                            "EXEC_NAME",
+                            std::env::current_exe()
+                                .ok()
+                                .unwrap()
+                                .file_name()
+                                .unwrap()
+                                .to_str()
+                                .unwrap()
+                        );
+                    println!("{}", usage_str);
                     println!("\nOptions:");
                     println!("{}", #options_str);
                     std::process::exit(1);
@@ -201,6 +231,12 @@ fn parse_cmd_args_derive2(item: proc_macro2::TokenStream) -> deluxe::Result<proc
                         ,
                         #(#match_arms_long_commands),*
                         ,
+                        "-h" => {
+                            print_help();
+                        },
+                        "--help" => {
+                            print_help();
+                        },
                         _ => {
                             error(&format!("[ERROR] '{}' is not a valid option", arg));
                         }

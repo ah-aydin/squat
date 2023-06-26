@@ -1,6 +1,7 @@
 use arg_parser::CmdArgs;
 
 #[derive(CmdArgs, Debug, Default)]
+#[metadata(description = "Squat virtual machine.")]
 pub struct Options {
     #[arg(short="-f", long="--file", description="The file to compile", required=true)]
     pub file: String,

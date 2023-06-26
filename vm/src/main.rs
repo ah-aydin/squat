@@ -1,14 +1,14 @@
-mod args;
 mod chunk;
 mod compiler;
 mod lexer;
 mod op_code;
+mod options;
 mod token;
 mod value;
 mod vm;
 
 use std::fs;
-use args::Options;
+use options::Options;
 use vm::{VM, InterpretResult};
 
 
