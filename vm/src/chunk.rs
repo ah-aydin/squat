@@ -98,7 +98,10 @@ impl Chunk {
             OpCode::JumpIfFalse(_) => self.code[location] = OpCode::JumpIfFalse(offset),
             OpCode::Jump(_) => self.code[location] = OpCode::Jump(offset),
             OpCode::JumpIfTrue(_) => self.code[location] = OpCode::JumpIfTrue(offset),
-            _ => panic!("Trying to modify instruction {:?} into a jump instruction", self.code[location])
+            _ => unreachable!(
+                "Trying to modify instruction {:?} into a jump instruction",
+                self.code[location]
+            )
         };
     }
 

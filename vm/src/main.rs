@@ -11,6 +11,8 @@ use std::fs;
 use options::Options;
 use vm::{VM, InterpretResult};
 
+use crate::value::SquatValue;
+
 
 fn run_file(opts: &Options) -> Result<(),()> {
     let mut vm = VM::new();
@@ -26,11 +28,22 @@ fn run_file(opts: &Options) -> Result<(),()> {
     if result == InterpretResult::InterpretCompileError {
         println!("CompileError");
         return Err(());
-    }
-    if result == InterpretResult::InterpretRuntimeError {
+    } else if result == InterpretResult::InterpretRuntimeError {
         println!("RuntimeError");
         return Err(());
+    } else if let InterpretResult::InterpretOk(value) = result {
+        let exit_code = match value {
+            SquatValue::Nil => 0.,
+            SquatValue::Number(value) => value,
+            _ => {
+                println!("[ERROR] Function 'main' can only return numbers");
+                return Ok(());
+            }
+        };
+
+        println!("Exit code: {exit_code}");
     }
+    
     return Ok(());
 }
 

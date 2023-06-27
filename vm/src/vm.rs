@@ -13,7 +13,7 @@ const INITIAL_CALL_STACK_SIZE: usize = 256;
 
 #[derive(PartialEq)]
 pub enum InterpretResult {
-    InterpretOk,
+    InterpretOk(SquatValue),
     InterpretCompileError,
     InterpretRuntimeError
 }
@@ -61,16 +61,25 @@ impl VM {
             &mut self.main_chunk,
             &mut self.constants
         );
-        let interpret_result = match compiler.compile() {
+        let compile_status = compiler.compile();
+
+        drop(compiler);
+        if opts.log_byte_code {
+            println!("---------------- INSTRUCTIONS ----------------");
+            self.main_chunk.disassemble();
+            println!("----------------------------------------------");
+        }
+
+        let interpret_result = match compile_status {
             CompileStatus::Success(global_count) => {
-                drop(compiler);
-                if opts.log_byte_code {
-                    println!("---------------- INSTRUCTIONS ----------------");
-                    self.main_chunk.disassemble();
-                    println!("----------------------------------------------");
-                }
                 self.globals = vec![None; global_count];
-                self.call_stack.push(CallFrame::new(0, self.main_chunk.get_main_start(), "main".to_owned()));
+                self.call_stack.push(
+                    CallFrame::new(
+                        0,
+                        self.main_chunk.get_main_start(),
+                        "main".to_owned()
+                    )
+                );
 
                 self.interpret_chunk(0, opts)
             },
@@ -137,7 +146,11 @@ impl VM {
                         let left = self.stack.pop();
 
                         if left.is_some() && right.is_some() {
-                            self.stack.push(SquatValue::String(left.unwrap().to_string() + &right.unwrap().to_string()));
+                            self.stack.push(
+                                SquatValue::String(
+                                    left.unwrap().to_string() + &right.unwrap().to_string()
+                                )
+                            );
                         } else {
                             panic!("Concat operation requires 2 values in the stack");
                         }
@@ -182,7 +195,9 @@ impl VM {
                         if let Some(Some(value)) = self.globals.get(index) {
                             self.stack.push(value.clone());
                         } else {
-                            self.runtime_error(&format!("Variable with index {} is not defined", index));
+                            self.runtime_error(
+                                &format!("Variable with index {} is not defined", index)
+                            );
                         }
                     },
                     OpCode::SetGlobal(index) => {
@@ -191,7 +206,9 @@ impl VM {
                             if let Some(Some(_value)) = self.globals.get(index) {
                                 self.globals[index] = Some(value.clone());
                             } else {
-                                self.runtime_error(&format!("You cannot set a global variable before defining it"));
+                                self.runtime_error(
+                                    &format!("You cannot set a global variable before defining it")
+                                );
                             }
                         } else {
                             panic!("SetGlobal OpCode expects a value to be on the stack");
@@ -242,7 +259,9 @@ impl VM {
                     OpCode::Call(arg_count) => {
                         let arg_count = *arg_count;
                         let func_data_location = self.stack.len() - 1 - arg_count;
-                        if let Some(SquatValue::Object(SquatObject::Function(func_data))) = self.stack.get(func_data_location) {
+                        if let Some(SquatValue::Object(
+                                SquatObject::Function(func_data)
+                            )) = self.stack.get(func_data_location) {
                             if arg_count != func_data.arity {
                                 self.runtime_error(
                                     &format!(
@@ -254,15 +273,23 @@ impl VM {
                                 return InterpretResult::InterpretRuntimeError;
                             }
                             let return_address = self.main_chunk.current_instruction;
-                            self.call_stack.push(CallFrame::new(self.stack.len() - arg_count, return_address, func_data.name.clone()));
+                            self.call_stack.push(
+                                CallFrame::new(
+                                    self.stack.len() - arg_count,
+                                    return_address,
+                                    func_data.name.clone()
+                                )
+                            );
                             self.main_chunk.current_instruction = func_data.start_instruction_index;
                         } else {
-                            panic!("Call OpCode expects a SquatValue::Object(SquatObject::Function(SquatFunction)) value on the stack");
+                            panic!(
+                                "Call OpCode expects a SquatValue::Object(SquatObject::Function(SquatFunction)) value on the stack"
+                            );
                         }
                     },
                     OpCode::Return => {
+                        let return_val = self.stack.pop().unwrap();
                         if let Some(call_frame) = self.call_stack.pop() {
-                            let return_val = self.stack.pop().unwrap();
                             while call_frame.stack_index < self.stack.len() {
                                 self.stack.pop(); // Pop local variables
                             }
@@ -270,13 +297,13 @@ impl VM {
                             self.main_chunk.current_instruction = call_frame.return_address;
                             self.stack.push(return_val);
                         } else {
-                            panic!("Return OpCode must contain a CallFrame in call_stack");
+                            return InterpretResult::InterpretOk(return_val);
                         }
                     },
 
                     OpCode::Start => {},
                     OpCode::Stop => {
-                        return InterpretResult::InterpretOk;
+                        return InterpretResult::InterpretOk(SquatValue::Number(0.));
                     }
                 }
             } else {
@@ -284,7 +311,7 @@ impl VM {
             }
         }
 
-        InterpretResult::InterpretOk
+        InterpretResult::InterpretOk(SquatValue::Number(0.))
     }
 
     fn binary_op<F>(&mut self, op: F)
@@ -323,15 +350,17 @@ impl VM {
     fn runtime_error(&mut self, message: &str) {
         println!("Error callstack:");
         for call_frame in self.call_stack.iter().rev() {
-            // let line;
-            // if call_frame.func_name == "main" {
-            //     line = self.main_chunk.get_main
-            // } else {
-            //     line = self.main_chunk.get_instruction_line(call_frame.return_address);
-            // }
-            println!("\tfunction '{}' called at line {}", call_frame.func_name, self.main_chunk.get_instruction_line(call_frame.return_address));
+            println!(
+                "\tfunction '{}' called at line {}",
+                call_frame.func_name,
+                self.main_chunk.get_instruction_line(call_frame.return_address)
+            );
         }
-        println!("[ERROR] (Line {}) {}", self.main_chunk.get_current_instruction_line(), message);
+        println!(
+            "[ERROR] (Line {}) {}",
+            self.main_chunk.get_current_instruction_line(),
+            message
+        );
         self.had_error = true;
     }
 }

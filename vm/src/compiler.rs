@@ -42,10 +42,23 @@ pub enum CompileStatus {
     Fail
 }
 
+#[derive(Clone, Copy)]
+enum ScopeType {
+    Global,
+    Function
+}
+
+#[derive(Debug)]
 struct Local {
     name: String,
     // If this value is missing, the variable is not initialized yet.
     depth: Option<u32>
+}
+
+#[derive(Debug)]
+struct Global {
+    index: usize,
+    initialized: bool
 }
 
 pub struct Compiler<'a> {
@@ -55,12 +68,15 @@ pub struct Compiler<'a> {
 
     main_chunk: &'a mut Chunk,
 
-    global_variable_indicies: HashMap<String, usize>,
+    //global_variable_indicies: HashMap<String, usize>,
+    globals: HashMap<String, Global>,
     constants: &'a mut ValueArray,
     functions: HashMap<String, (usize, usize)>, // (key, value) => (func_name, (start_index, arity))
 
     locals: Vec<Local>,
     scope_depth: u32,
+    scope_type: ScopeType,
+    scope_stack_index: usize,
 
     had_error: bool,
     panic_mode: bool,
@@ -82,12 +98,14 @@ impl<'a> Compiler<'a> {
             
             main_chunk,
 
-            global_variable_indicies: HashMap::new(),
+            globals: HashMap::new(),
             constants,
             functions: HashMap::new(),
 
             locals: Vec::with_capacity(INITIAL_LOCALS_VECTOR_SIZE),
             scope_depth: 0,
+            scope_type: ScopeType::Global,
+            scope_stack_index: 0,
 
             had_error: false,
             panic_mode: false,
@@ -105,7 +123,7 @@ impl<'a> Compiler<'a> {
         }
         self.main_chunk.write(OpCode::JumpTo(self.main_start), 0);
 
-        let mut compile_status = CompileStatus::Success(self.global_variable_indicies.len());
+        let mut compile_status = CompileStatus::Success(self.globals.len());
 
         if !self.found_main {
             compile_status = CompileStatus::Fail;
@@ -116,7 +134,7 @@ impl<'a> Compiler<'a> {
         }
 
         #[cfg(debug_assertions)]
-        println!("Global variable indicies {:?}", self.global_variable_indicies);
+        println!("Global variable indicies {:?}", self.globals);
         #[cfg(debug_assertions)]
         println!("Functions {:?}", self.functions);
         #[cfg(debug_assertions)]
@@ -152,7 +170,6 @@ impl<'a> Compiler<'a> {
             self.compile_warning("Unnecessary ';'");
         } else if self.check_current(TokenType::Func) {
             self.function_declaration();
-            //self.compile_error("You cannot define a function inside another function");
         } else if self.check_current(TokenType::Var) {
             self.var_declaration();
         } else if self.check_current(TokenType::Return) {
@@ -167,25 +184,31 @@ impl<'a> Compiler<'a> {
     }
 
     fn function_declaration(&mut self) {
-        let index = match self.parse_variable("Expect variable name") {
+        let (index, func_name) = match self.parse_variable("Expect variable name") {
             Ok(value) => value,
             Err(()) => {
                 return;
             }
         };
 
-        let func_name = self.previous_token.as_ref().unwrap().lexeme.clone();
-        let constant_index;
-
         self.consume_current(TokenType::LeftParenthesis, "Expect '(' after function name.");
         if func_name == "main" {
             if self.found_main {
                 self.compile_error("Cannot have more then 1 main function");
             }
+
+            let old_scope_type = self.scope_type;
+            let old_scope_stack_index = self.scope_stack_index;
+            self.scope_stack_index = self.locals.len();
+            self.scope_type = ScopeType::Function;
+
             self.begin_scope();
 
             self.found_main = true;
-            self.consume_current(TokenType::RightParenthesis, "Expect closing ')'. Function 'main' does not take arguments."); 
+            self.consume_current(
+                TokenType::RightParenthesis,
+                "Expect closing ')'. Function 'main' does not take arguments."
+            ); 
             self.consume_current(TokenType::LeftBrace, "Expected '{' to define function body");
 
             let jump = self.emit_jump(OpCode::Jump(usize::MAX));
@@ -197,27 +220,37 @@ impl<'a> Compiler<'a> {
             self.end_scope();
             self.write_op_code(OpCode::Stop);
             self.patch_jump(jump);
+
+            self.scope_type = old_scope_type;
+            self.scope_stack_index = old_scope_stack_index;
         } else {
             if self.functions.contains_key(&func_name) { // TODO consider adding function
                                                          // overloading
                 self.compile_error(&format!("Function '{}' is already defined.", func_name));
             }
+
+            let old_scope_type = self.scope_type;
+            let old_scope_stack_index = self.scope_stack_index;
+            self.scope_stack_index = self.locals.len();
+            self.scope_type = ScopeType::Function;
+
+            self.patch_function(&func_name);
             self.begin_scope();
 
             let jump = self.emit_jump(OpCode::Jump(usize::MAX));
             let mut arity = 0;
             if !self.check_current(TokenType::RightParenthesis) {
                 arity += 1;
-                let constant = self.parse_variable("Expect parameter name").unwrap();
-                self.define_variable(constant);
+                let (constant, var_name) = self.parse_variable("Expect parameter name").unwrap();
+                self.define_variable(constant, &var_name);
 
                 while self.check_current(TokenType::Comma) {
                     arity += 1;
                     if arity > 255 {
                         self.compile_error("Can't have more then 255 parameters on a function");
                     }
-                    let constant = self.parse_variable("Expect parameter name").unwrap();
-                    self.define_variable(constant);
+                    let (constant, var_name) = self.parse_variable("Expect parameter name").unwrap();
+                    self.define_variable(constant, &var_name);
                 }
                 self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
             }
@@ -234,16 +267,20 @@ impl<'a> Compiler<'a> {
             self.write_op_code(OpCode::Return);
             self.patch_jump(jump);
 
-            let function_obj = SquatObject::Function(SquatFunction::new(&func_name, starting_index, arity));
-            constant_index = self.constants.write(SquatValue::Object(function_obj));
+            let function_obj = SquatObject::Function(
+                SquatFunction::new(&func_name, starting_index, arity)
+            );
+            let constant_index = self.constants.write(SquatValue::Object(function_obj));
             self.write_op_code(OpCode::Constant(constant_index));
-            self.define_variable(index);
-        }
+            self.define_function(index);
 
+            self.scope_type = old_scope_type;
+            self.scope_stack_index = old_scope_stack_index;
+        }
     }
 
     fn var_declaration(&mut self) {
-        let index = match self.parse_variable("Expect variable name") {
+        let (index, name) = match self.parse_variable("Expect variable name") {
             Ok(value) => value,
             Err(()) => {
                 return;
@@ -258,22 +295,22 @@ impl<'a> Compiler<'a> {
 
         self.consume_current(TokenType::Semicolon, "Expect ';' after variable declaration.");
 
-        self.define_variable(index);
+        self.define_variable(index, &name);
     }
 
-    fn parse_variable(&mut self, error_msg: &str) -> Result<usize, ()> {
+    /// Return value:
+    /// If local  -> (0, variable_name: String)
+    /// If global -> (global_index: usize, variable_name: String)
+    fn parse_variable(&mut self, error_msg: &str) -> Result<(usize, String), ()> {
         self.consume_current(TokenType::Identifier, error_msg);
 
+        let name = self.previous_token.as_ref().unwrap().lexeme.clone();
         if self.scope_depth > 0 {
-            let name = self.previous_token.as_ref().unwrap().lexeme.clone();
-            
             for i in (0..self.locals.len()).rev() {
                 if let Some(depth) = self.locals[i].depth {
                     if depth < self.scope_depth {
                         break;
                     }
-                } else {
-                    self.compile_error("Can't read local variable in its own initializer.");
                 }
 
                 if self.locals[i].name == name {
@@ -284,31 +321,48 @@ impl<'a> Compiler<'a> {
                             &self.scope_depth
                         )
                     );
-                    return Ok(0);
+                    return Ok((0, name));
                 }
             }
-            let local = Local { name, depth: None };
+            let local = Local { name: name.clone(), depth: None };
+            let index = self.locals.len();
             self.locals.push(local);
-            return Ok(0);
+            return Ok((index, name));
         }
 
         let var_name = self.previous_token.as_ref().unwrap().lexeme.clone();
-        if self.global_variable_indicies.get(&var_name).is_some() {
+        if self.globals.get(&var_name).is_some() {
             self.compile_error(&format!("{} is allready defined", var_name));
             return Err(());
         }
 
-        let index = self.global_variable_indicies.len();
-        self.global_variable_indicies.insert(var_name, self.global_variable_indicies.len());
-        Ok(index)
+        let index = self.globals.len();
+        let global = Global { index, initialized: false };
+        self.globals.insert(var_name, global);
+        Ok((index, name))
     }
 
-    fn define_variable(&mut self, index: usize) {
+    fn patch_function(&mut self, name: &str) {
         if self.scope_depth > 0 {
             self.locals.last_mut().unwrap().depth = Some(self.scope_depth);
             return;
         }
+        self.globals.get_mut(name).unwrap().initialized = true;
+    }
 
+    fn define_function(&mut self, index: usize) {
+        if self.scope_depth > 0 {
+            return;
+        }
+        self.write_op_code(OpCode::DefineGlobal(index));
+    }
+
+    fn define_variable(&mut self, index: usize, name: &str) {
+        if self.scope_depth > 0 {
+            self.locals.last_mut().unwrap().depth = Some(self.scope_depth);
+            return;
+        }
+        self.globals.get_mut(name).unwrap().initialized = true;
         self.write_op_code(OpCode::DefineGlobal(index));
     }
 
@@ -448,7 +502,9 @@ impl<'a> Compiler<'a> {
         self.advance();
         self.call_prefix(self.previous_token.as_ref().unwrap().token_type);
 
-        while precedence <= self.get_precedence(self.current_token.as_ref().unwrap().token_type) {
+        while precedence <= self.get_precedence(
+            self.current_token.as_ref().unwrap().token_type
+        ) {
             self.advance();
 
             if self.check_previous(TokenType::Question) {
@@ -581,12 +637,12 @@ impl<'a> Compiler<'a> {
         let get_op_code: OpCode;
 
         if let Some(index) = self.resolve_local(&var_name) {
-            set_op_code = OpCode::SetLocal(index);
-            get_op_code = OpCode::GetLocal(index);
+            set_op_code = OpCode::SetLocal(index - self.scope_stack_index);
+            get_op_code = OpCode::GetLocal(index - self.scope_stack_index);
         } else {
-            if let Some(index) = self.global_variable_indicies.get(&var_name) {
-                set_op_code = OpCode::SetGlobal(*index);
-                get_op_code = OpCode::GetGlobal(*index);
+            if let Some(index) = self.resolve_global(&var_name) {
+                set_op_code = OpCode::SetGlobal(index);
+                get_op_code = OpCode::GetGlobal(index);
             } else {
                 self.compile_error(&format!("{} is not defined.", var_name));
                 return;
@@ -619,7 +675,10 @@ impl<'a> Compiler<'a> {
                 Err(err) => {
                     match err {
                         LexerError::UndefinedToken { line, lexeme }
-                            => self.compile_error_token(line, &format!("undefined token '{}'", lexeme)),
+                            => self.compile_error_token(
+                                line,
+                                &format!("undefined token '{}'", lexeme)
+                            ),
                         LexerError::IncompleteComment { line }
                             => self.compile_error_token(line, "incomplete comment"),
                         LexerError::IncompleteString { line }
@@ -665,11 +724,13 @@ impl<'a> Compiler<'a> {
     }
 
     fn synchronize(&mut self) {
+        // TODO this function needs more word to function properly
         self.panic_mode = false;
         while self.current_token.as_ref().unwrap().token_type != TokenType::Eof {
             match self.current_token.as_ref().unwrap().token_type {
                 TokenType::Class | TokenType::Func | TokenType::Var | TokenType::For |
-                    TokenType::If | TokenType::While | TokenType::Print | TokenType::Return => {
+                    TokenType::If | TokenType::While | TokenType::Print |
+                    TokenType::Return => {
                         break;
                     },
                TokenType::Semicolon=> {
@@ -694,10 +755,21 @@ impl<'a> Compiler<'a> {
         self.scope_depth -= 1;
 
         // Remove the local variables from the stack
-        while self.locals.len() > 0 && self.locals[self.locals.len() - 1].depth.unwrap() > self.scope_depth {
+        while self.locals.len() > 0 &&
+            self.locals[self.locals.len() - 1].depth.unwrap_or(0) > self.scope_depth
+        {
             self.write_op_code(OpCode::Pop);
             self.locals.pop();
         }
+    }
+
+    fn resolve_global(&mut self, name: &str) -> Option<usize> {
+        if let Some(global) = self.globals.get(name) {
+            if global.initialized {
+                return Some(global.index);
+            }
+        }
+        None
     }
 
     fn resolve_local(&mut self, name: &str) -> Option<usize> {
