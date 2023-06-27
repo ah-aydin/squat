@@ -311,16 +311,13 @@ impl<'a> Compiler<'a> {
     }
 
     fn patch_function(&mut self, name: &str) {
+        println!("Function: {name}");
         if self.scope_depth > 0 {
-            for i in (0..self.locals.len()).rev() {
-                if self.locals[i].depth.unwrap_or(u32::MAX) > self.scope_depth {
-                    continue;
-                } else if self.locals[i].depth.unwrap_or(u32::MAX) == self.scope_depth {
-                    self.locals[i].depth = Some(self.scope_depth);
-                }
-                break;
-            }
+            println!("Local");
+            self.locals.last_mut().unwrap().depth = Some(self.scope_depth);
+            return;
         }
+        println!("Global");
         self.globals.get_mut(name).unwrap().initialized = true;
     }
 

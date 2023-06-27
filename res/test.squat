@@ -96,12 +96,15 @@ func main() {
         print "a is 10";
     }
 
-    /*func inner_func() {
+    func inner_func() {
         //print "This is the inner func " ++ (a - b);
         print "This is the inner func ";
     }
 
-    inner_func();*/
+    //inner_func(12, 2);
+    inner_func();
+    var sss = "one two tree";
+    print sss;
 }
 
 var global_var4 = 40;
