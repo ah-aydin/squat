@@ -1,3 +1,4 @@
+//var global_var = 10 + global_var;
 var global_var = 10;
 
 func printHelloThere() {
@@ -31,9 +32,6 @@ func is_odd(number) {
     return true;
 }
 
-func is_even(number) {
-    return number % 2 == 0;
-}
 func is_even(number) {
     return number % 2 == 0;
 }

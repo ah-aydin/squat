@@ -42,10 +42,18 @@ pub enum CompileStatus {
     Fail
 }
 
+#[derive(Debug)]
 struct Local {
     name: String,
     // If this value is missing, the variable is not initialized yet.
     depth: Option<u32>
+}
+
+#[derive(Debug)]
+struct Global {
+    name: String,
+    index: usize,
+    initialized: bool
 }
 
 pub struct Compiler<'a> {
@@ -55,7 +63,8 @@ pub struct Compiler<'a> {
 
     main_chunk: &'a mut Chunk,
 
-    global_variable_indicies: HashMap<String, usize>,
+    //global_variable_indicies: HashMap<String, usize>,
+    globals: HashMap<String, Global>,
     constants: &'a mut ValueArray,
     functions: HashMap<String, (usize, usize)>, // (key, value) => (func_name, (start_index, arity))
 
@@ -82,7 +91,7 @@ impl<'a> Compiler<'a> {
             
             main_chunk,
 
-            global_variable_indicies: HashMap::new(),
+            globals: HashMap::new(),
             constants,
             functions: HashMap::new(),
 
@@ -105,7 +114,7 @@ impl<'a> Compiler<'a> {
         }
         self.main_chunk.write(OpCode::JumpTo(self.main_start), 0);
 
-        let mut compile_status = CompileStatus::Success(self.global_variable_indicies.len());
+        let mut compile_status = CompileStatus::Success(self.globals.len());
 
         if !self.found_main {
             compile_status = CompileStatus::Fail;
@@ -116,7 +125,7 @@ impl<'a> Compiler<'a> {
         }
 
         #[cfg(debug_assertions)]
-        println!("Global variable indicies {:?}", self.global_variable_indicies);
+        println!("Global variable indicies {:?}", self.globals);
         #[cfg(debug_assertions)]
         println!("Functions {:?}", self.functions);
         #[cfg(debug_assertions)]
@@ -167,14 +176,14 @@ impl<'a> Compiler<'a> {
     }
 
     fn function_declaration(&mut self) {
-        let index = match self.parse_variable("Expect variable name") {
+        let (index, func_name) = match self.parse_variable("Expect variable name") {
             Ok(value) => value,
             Err(()) => {
                 return;
             }
         };
 
-        let func_name = self.previous_token.as_ref().unwrap().lexeme.clone();
+        //let func_name = self.previous_token.as_ref().unwrap().lexeme.clone();
         let constant_index;
 
         self.consume_current(TokenType::LeftParenthesis, "Expect '(' after function name.");
@@ -208,16 +217,16 @@ impl<'a> Compiler<'a> {
             let mut arity = 0;
             if !self.check_current(TokenType::RightParenthesis) {
                 arity += 1;
-                let constant = self.parse_variable("Expect parameter name").unwrap();
-                self.define_variable(constant);
+                let (constant, var_name) = self.parse_variable("Expect parameter name").unwrap();
+                self.define_variable(constant, &var_name);
 
                 while self.check_current(TokenType::Comma) {
                     arity += 1;
                     if arity > 255 {
                         self.compile_error("Can't have more then 255 parameters on a function");
                     }
-                    let constant = self.parse_variable("Expect parameter name").unwrap();
-                    self.define_variable(constant);
+                    let (constant, var_name) = self.parse_variable("Expect parameter name").unwrap();
+                    self.define_variable(constant, &var_name);
                 }
                 self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
             }
@@ -237,13 +246,12 @@ impl<'a> Compiler<'a> {
             let function_obj = SquatObject::Function(SquatFunction::new(&func_name, starting_index, arity));
             constant_index = self.constants.write(SquatValue::Object(function_obj));
             self.write_op_code(OpCode::Constant(constant_index));
-            self.define_variable(index);
+            self.define_variable(index, &func_name);
         }
-
     }
 
     fn var_declaration(&mut self) {
-        let index = match self.parse_variable("Expect variable name") {
+        let (index, name) = match self.parse_variable("Expect variable name") {
             Ok(value) => value,
             Err(()) => {
                 return;
@@ -258,22 +266,22 @@ impl<'a> Compiler<'a> {
 
         self.consume_current(TokenType::Semicolon, "Expect ';' after variable declaration.");
 
-        self.define_variable(index);
+        self.define_variable(index, &name);
     }
 
-    fn parse_variable(&mut self, error_msg: &str) -> Result<usize, ()> {
+    /// Return value:
+    /// If local  -> (0, variable_name: String)
+    /// If global -> (global_index: usize, variable_name: String)
+    fn parse_variable(&mut self, error_msg: &str) -> Result<(usize, String), ()> {
         self.consume_current(TokenType::Identifier, error_msg);
 
+        let name = self.previous_token.as_ref().unwrap().lexeme.clone();
         if self.scope_depth > 0 {
-            let name = self.previous_token.as_ref().unwrap().lexeme.clone();
-            
             for i in (0..self.locals.len()).rev() {
                 if let Some(depth) = self.locals[i].depth {
                     if depth < self.scope_depth {
                         break;
                     }
-                } else {
-                    self.compile_error("Can't read local variable in its own initializer.");
                 }
 
                 if self.locals[i].name == name {
@@ -284,31 +292,32 @@ impl<'a> Compiler<'a> {
                             &self.scope_depth
                         )
                     );
-                    return Ok(0);
+                    return Ok((0, name));
                 }
             }
-            let local = Local { name, depth: None };
+            let local = Local { name: name.clone(), depth: None };
             self.locals.push(local);
-            return Ok(0);
+            return Ok((0, name));
         }
 
         let var_name = self.previous_token.as_ref().unwrap().lexeme.clone();
-        if self.global_variable_indicies.get(&var_name).is_some() {
+        if self.globals.get(&var_name).is_some() {
             self.compile_error(&format!("{} is allready defined", var_name));
             return Err(());
         }
 
-        let index = self.global_variable_indicies.len();
-        self.global_variable_indicies.insert(var_name, self.global_variable_indicies.len());
-        Ok(index)
+        let index = self.globals.len();
+        let global = Global { name: name.clone(), index, initialized: false };
+        self.globals.insert(var_name, global);
+        Ok((index, name))
     }
 
-    fn define_variable(&mut self, index: usize) {
+    fn define_variable(&mut self, index: usize, name: &str) {
         if self.scope_depth > 0 {
             self.locals.last_mut().unwrap().depth = Some(self.scope_depth);
             return;
         }
-
+        self.globals.get_mut(name).unwrap().initialized = true;
         self.write_op_code(OpCode::DefineGlobal(index));
     }
 
@@ -584,9 +593,10 @@ impl<'a> Compiler<'a> {
             set_op_code = OpCode::SetLocal(index);
             get_op_code = OpCode::GetLocal(index);
         } else {
-            if let Some(index) = self.global_variable_indicies.get(&var_name) {
-                set_op_code = OpCode::SetGlobal(*index);
-                get_op_code = OpCode::GetGlobal(*index);
+            //if let Some(index) = self.global_variable_indicies.get(&var_name) {
+            if let Some(index) = self.resolve_global(&var_name) {
+                set_op_code = OpCode::SetGlobal(index);
+                get_op_code = OpCode::GetGlobal(index);
             } else {
                 self.compile_error(&format!("{} is not defined.", var_name));
                 return;
@@ -698,6 +708,15 @@ impl<'a> Compiler<'a> {
             self.write_op_code(OpCode::Pop);
             self.locals.pop();
         }
+    }
+
+    fn resolve_global(&mut self, name: &str) -> Option<usize> {
+        if let Some(global) = self.globals.get(name) {
+            if global.initialized {
+                return Some(global.index);
+            }
+        }
+        None
     }
 
     fn resolve_local(&mut self, name: &str) -> Option<usize> {
