@@ -71,7 +71,6 @@ pub struct Compiler<'a> {
     //global_variable_indicies: HashMap<String, usize>,
     globals: HashMap<String, Global>,
     constants: &'a mut ValueArray,
-    functions: HashMap<String, (usize, usize)>, // (key, value) => (func_name, (start_index, arity))
 
     locals: Vec<Local>,
     scope_depth: u32,
@@ -100,7 +99,6 @@ impl<'a> Compiler<'a> {
 
             globals: HashMap::new(),
             constants,
-            functions: HashMap::new(),
 
             locals: Vec::with_capacity(INITIAL_LOCALS_VECTOR_SIZE),
             scope_depth: 0,
@@ -135,8 +133,6 @@ impl<'a> Compiler<'a> {
 
         #[cfg(debug_assertions)]
         println!("Global variable indicies {:?}", self.globals);
-        #[cfg(debug_assertions)]
-        println!("Functions {:?}", self.functions);
         #[cfg(debug_assertions)]
         println!("Constants {:?}", self.constants);
 
@@ -224,11 +220,6 @@ impl<'a> Compiler<'a> {
             self.scope_type = old_scope_type;
             self.scope_stack_index = old_scope_stack_index;
         } else {
-            if self.functions.contains_key(&func_name) { // TODO consider adding function
-                                                         // overloading
-                self.compile_error(&format!("Function '{}' is already defined.", func_name));
-            }
-
             let old_scope_type = self.scope_type;
             let old_scope_stack_index = self.scope_stack_index;
             self.scope_stack_index = self.locals.len();
@@ -259,7 +250,6 @@ impl<'a> Compiler<'a> {
 
             self.write_op_code(OpCode::Start);
             let starting_index = self.main_chunk.get_size() - 1;
-            self.functions.insert(func_name.clone(), (starting_index, arity));
             
             self.block();
             self.end_scope();

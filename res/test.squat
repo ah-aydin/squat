@@ -10,11 +10,11 @@ func printHelloThere() {
 }
 
 func exampleFunc(num1, num2) {
-    func inner_inner_inner_func(a) {
+    func inner_inner_func(a) {
         print "THIS IS INNER INNER EXMPALE FUNC " ++ a;
     }
-    inner_inner_inner_func(1);
-    inner_inner_inner_func(2);
+    inner_inner_func(1);
+    inner_inner_func(2);
     print "The sum is";
     print num1 + num2;
     return num1 + num2;
@@ -107,7 +107,6 @@ func main() {
 
     func inner_func(a, b) {
         print "This is the inner func " ++ (a - b);
-        //print "This is the inner func ";
         func inner_inner_func(a) {
             var meh = 10;
             print "THIS IS INNER INNER FUNC " ++ (a + meh);

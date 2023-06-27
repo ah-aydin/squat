@@ -33,7 +33,10 @@ impl ToString for SquatObject {
 impl PartialEq for SquatObject {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (SquatObject::Function(func1), SquatObject::Function(func2)) => func1.name == func2.name
+            (
+                SquatObject::Function(func1), 
+                SquatObject::Function(func2)
+            ) => func1.start_instruction_index == func2.start_instruction_index
         }
     }
 }
@@ -129,6 +132,9 @@ impl ValueArray {
         // It might be faster, for now with small programs, linear search should be faster then
         // computing the hash
         if let Some(index) = self.values.iter().position(|v| *v == value) {
+            if let Some(SquatValue::Object(SquatObject::Function(func))) = self.values.get(index) {
+                println!("Found same squat function {}", func.name);
+            }
             return index;
         }
         self.values.push(value);
@@ -142,8 +148,8 @@ mod test {
 
     #[test]
     fn not_equal_functions() {
-        let val1 = SquatValue::Object(SquatObject::Function(SquatFunction::new("func1", 0, 0)));
-        let val2 = SquatValue::Object(SquatObject::Function(SquatFunction::new("func2", 0, 0)));
+        let val1 = SquatValue::Object(SquatObject::Function(SquatFunction::new("func1", 12, 0)));
+        let val2 = SquatValue::Object(SquatObject::Function(SquatFunction::new("func1", 0, 0)));
         assert_ne!(val1, val2);
     }
 
