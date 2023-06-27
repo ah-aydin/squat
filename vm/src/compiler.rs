@@ -151,7 +151,8 @@ impl<'a> Compiler<'a> {
         if self.check_current(TokenType::Semicolon) {
             self.compile_warning("Unnecessary ';'");
         } else if self.check_current(TokenType::Func) {
-            self.compile_error("You cannot define a function inside another function");
+            self.function_declaration();
+            //self.compile_error("You cannot define a function inside another function");
         } else if self.check_current(TokenType::Var) {
             self.var_declaration();
         } else if self.check_current(TokenType::Return) {
@@ -169,7 +170,7 @@ impl<'a> Compiler<'a> {
         let index = match self.parse_variable("Expect variable name") {
             Ok(value) => value,
             Err(()) => {
-                return;
+                0
             }
         };
 
@@ -196,9 +197,6 @@ impl<'a> Compiler<'a> {
             self.end_scope();
             self.write_op_code(OpCode::Stop);
             self.patch_jump(jump);
-            
-            let function_obj = SquatObject::Function(SquatFunction::new(&func_name, self.main_start, 0));
-            constant_index = self.constants.write(SquatValue::Object(function_obj));
         } else {
             if self.functions.contains_key(&func_name) { // TODO consider adding function
                                                          // overloading
@@ -238,10 +236,10 @@ impl<'a> Compiler<'a> {
 
             let function_obj = SquatObject::Function(SquatFunction::new(&func_name, starting_index, arity));
             constant_index = self.constants.write(SquatValue::Object(function_obj));
+            self.write_op_code(OpCode::Constant(constant_index));
+            self.define_variable(index);
         }
 
-        self.write_op_code(OpCode::Constant(constant_index));
-        self.define_variable(index);
     }
 
     fn var_declaration(&mut self) {
@@ -281,7 +279,7 @@ impl<'a> Compiler<'a> {
                 if self.locals[i].name == name {
                     self.compile_error(
                         &format!(
-                            "Variable with name '{}' allready exists in this scope (depth: {})",
+                            "'{}' allready exists in this scope (depth: {})",
                             name,
                             &self.scope_depth
                         )
@@ -295,6 +293,9 @@ impl<'a> Compiler<'a> {
         }
 
         let var_name = self.previous_token.as_ref().unwrap().lexeme.clone();
+        if var_name == "main" {
+            return Err(());
+        }
         if self.global_variable_indicies.get(&var_name).is_some() {
             self.compile_error(&format!("{} is allready defined", var_name));
             return Err(());

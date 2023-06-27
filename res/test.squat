@@ -94,6 +94,13 @@ func main() {
     if (a == 10) {
         print "a is 10";
     }
+
+    /*func inner_func() {
+        //print "This is the inner func " ++ (a - b);
+        print "This is the inner func ";
+    }
+
+    inner_func();*/
 }
 
 var global_var4 = 40;

@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use crate::{
     chunk::Chunk,
     op_code::OpCode,
