@@ -34,6 +34,9 @@ func is_odd(number) {
 func is_even(number) {
     return number % 2 == 0;
 }
+func is_even(number) {
+    return number % 2 == 0;
+}
 
 func test_pass_func(fun) {
     print test_pass_func;

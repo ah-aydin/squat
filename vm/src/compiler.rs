@@ -170,7 +170,7 @@ impl<'a> Compiler<'a> {
         let index = match self.parse_variable("Expect variable name") {
             Ok(value) => value,
             Err(()) => {
-                0
+                return;
             }
         };
 
@@ -293,9 +293,6 @@ impl<'a> Compiler<'a> {
         }
 
         let var_name = self.previous_token.as_ref().unwrap().lexeme.clone();
-        if var_name == "main" {
-            return Err(());
-        }
         if self.global_variable_indicies.get(&var_name).is_some() {
             self.compile_error(&format!("{} is allready defined", var_name));
             return Err(());
@@ -670,15 +667,15 @@ impl<'a> Compiler<'a> {
     fn synchronize(&mut self) {
         self.panic_mode = false;
         while self.current_token.as_ref().unwrap().token_type != TokenType::Eof {
-            if self.current_token.as_ref().unwrap().token_type == TokenType::Semicolon {
-                self.advance();
-                break;
-            }
             match self.current_token.as_ref().unwrap().token_type {
                 TokenType::Class | TokenType::Func | TokenType::Var | TokenType::For |
                     TokenType::If | TokenType::While | TokenType::Print | TokenType::Return => {
                         break;
-                    }
+                    },
+               TokenType::Semicolon=> {
+                   self.advance();
+                   break;
+               }
                 _ => {}
             }
             self.advance();
