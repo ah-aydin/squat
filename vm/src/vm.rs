@@ -61,14 +61,17 @@ impl VM {
             &mut self.main_chunk,
             &mut self.constants
         );
-        let interpret_result = match compiler.compile() {
+        let compile_status = compiler.compile();
+
+        drop(compiler);
+        if opts.log_byte_code {
+            println!("---------------- INSTRUCTIONS ----------------");
+            self.main_chunk.disassemble();
+            println!("----------------------------------------------");
+        }
+
+        let interpret_result = match compile_status {
             CompileStatus::Success(global_count) => {
-                drop(compiler);
-                if opts.log_byte_code {
-                    println!("---------------- INSTRUCTIONS ----------------");
-                    self.main_chunk.disassemble();
-                    println!("----------------------------------------------");
-                }
                 self.globals = vec![None; global_count];
                 self.call_stack.push(CallFrame::new(0, self.main_chunk.get_main_start(), "main".to_owned()));
 

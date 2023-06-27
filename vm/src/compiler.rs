@@ -183,9 +183,6 @@ impl<'a> Compiler<'a> {
             }
         };
 
-        //let func_name = self.previous_token.as_ref().unwrap().lexeme.clone();
-        let constant_index;
-
         self.consume_current(TokenType::LeftParenthesis, "Expect '(' after function name.");
         if func_name == "main" {
             if self.found_main {
@@ -211,6 +208,7 @@ impl<'a> Compiler<'a> {
                                                          // overloading
                 self.compile_error(&format!("Function '{}' is already defined.", func_name));
             }
+            self.patch_function(&func_name);
             self.begin_scope();
 
             let jump = self.emit_jump(OpCode::Jump(usize::MAX));
@@ -244,7 +242,7 @@ impl<'a> Compiler<'a> {
             self.patch_jump(jump);
 
             let function_obj = SquatObject::Function(SquatFunction::new(&func_name, starting_index, arity));
-            constant_index = self.constants.write(SquatValue::Object(function_obj));
+            let constant_index = self.constants.write(SquatValue::Object(function_obj));
             self.write_op_code(OpCode::Constant(constant_index));
             self.define_variable(index, &func_name);
         }
@@ -310,6 +308,20 @@ impl<'a> Compiler<'a> {
         let global = Global { name: name.clone(), index, initialized: false };
         self.globals.insert(var_name, global);
         Ok((index, name))
+    }
+
+    fn patch_function(&mut self, name: &str) {
+        if self.scope_depth > 0 {
+            for i in (0..self.locals.len()).rev() {
+                if self.locals[i].depth.unwrap_or(u32::MAX) > self.scope_depth {
+                    continue;
+                } else if self.locals[i].depth.unwrap_or(u32::MAX) == self.scope_depth {
+                    self.locals[i].depth = Some(self.scope_depth);
+                }
+                break;
+            }
+        }
+        self.globals.get_mut(name).unwrap().initialized = true;
     }
 
     fn define_variable(&mut self, index: usize, name: &str) {
@@ -593,7 +605,6 @@ impl<'a> Compiler<'a> {
             set_op_code = OpCode::SetLocal(index);
             get_op_code = OpCode::GetLocal(index);
         } else {
-            //if let Some(index) = self.global_variable_indicies.get(&var_name) {
             if let Some(index) = self.resolve_global(&var_name) {
                 set_op_code = OpCode::SetGlobal(index);
                 get_op_code = OpCode::GetGlobal(index);
@@ -704,7 +715,7 @@ impl<'a> Compiler<'a> {
         self.scope_depth -= 1;
 
         // Remove the local variables from the stack
-        while self.locals.len() > 0 && self.locals[self.locals.len() - 1].depth.unwrap() > self.scope_depth {
+        while self.locals.len() > 0 && self.locals[self.locals.len() - 1].depth.unwrap_or(0) > self.scope_depth {
             self.write_op_code(OpCode::Pop);
             self.locals.pop();
         }
