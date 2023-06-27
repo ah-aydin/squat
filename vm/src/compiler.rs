@@ -170,7 +170,6 @@ impl<'a> Compiler<'a> {
             self.compile_warning("Unnecessary ';'");
         } else if self.check_current(TokenType::Func) {
             self.function_declaration();
-            //self.compile_error("You cannot define a function inside another function");
         } else if self.check_current(TokenType::Var) {
             self.var_declaration();
         } else if self.check_current(TokenType::Return) {
@@ -206,7 +205,10 @@ impl<'a> Compiler<'a> {
             self.begin_scope();
 
             self.found_main = true;
-            self.consume_current(TokenType::RightParenthesis, "Expect closing ')'. Function 'main' does not take arguments."); 
+            self.consume_current(
+                TokenType::RightParenthesis,
+                "Expect closing ')'. Function 'main' does not take arguments."
+            ); 
             self.consume_current(TokenType::LeftBrace, "Expected '{' to define function body");
 
             let jump = self.emit_jump(OpCode::Jump(usize::MAX));
@@ -265,7 +267,9 @@ impl<'a> Compiler<'a> {
             self.write_op_code(OpCode::Return);
             self.patch_jump(jump);
 
-            let function_obj = SquatObject::Function(SquatFunction::new(&func_name, starting_index, arity));
+            let function_obj = SquatObject::Function(
+                SquatFunction::new(&func_name, starting_index, arity)
+            );
             let constant_index = self.constants.write(SquatValue::Object(function_obj));
             self.write_op_code(OpCode::Constant(constant_index));
             self.define_function(index);
@@ -498,7 +502,9 @@ impl<'a> Compiler<'a> {
         self.advance();
         self.call_prefix(self.previous_token.as_ref().unwrap().token_type);
 
-        while precedence <= self.get_precedence(self.current_token.as_ref().unwrap().token_type) {
+        while precedence <= self.get_precedence(
+            self.current_token.as_ref().unwrap().token_type
+        ) {
             self.advance();
 
             if self.check_previous(TokenType::Question) {
@@ -669,7 +675,10 @@ impl<'a> Compiler<'a> {
                 Err(err) => {
                     match err {
                         LexerError::UndefinedToken { line, lexeme }
-                            => self.compile_error_token(line, &format!("undefined token '{}'", lexeme)),
+                            => self.compile_error_token(
+                                line,
+                                &format!("undefined token '{}'", lexeme)
+                            ),
                         LexerError::IncompleteComment { line }
                             => self.compile_error_token(line, "incomplete comment"),
                         LexerError::IncompleteString { line }
@@ -715,11 +724,13 @@ impl<'a> Compiler<'a> {
     }
 
     fn synchronize(&mut self) {
+        // TODO this function needs more word to function properly
         self.panic_mode = false;
         while self.current_token.as_ref().unwrap().token_type != TokenType::Eof {
             match self.current_token.as_ref().unwrap().token_type {
                 TokenType::Class | TokenType::Func | TokenType::Var | TokenType::For |
-                    TokenType::If | TokenType::While | TokenType::Print | TokenType::Return => {
+                    TokenType::If | TokenType::While | TokenType::Print |
+                    TokenType::Return => {
                         break;
                     },
                TokenType::Semicolon=> {
@@ -744,7 +755,9 @@ impl<'a> Compiler<'a> {
         self.scope_depth -= 1;
 
         // Remove the local variables from the stack
-        while self.locals.len() > 0 && self.locals[self.locals.len() - 1].depth.unwrap_or(0) > self.scope_depth {
+        while self.locals.len() > 0 &&
+            self.locals[self.locals.len() - 1].depth.unwrap_or(0) > self.scope_depth
+        {
             self.write_op_code(OpCode::Pop);
             self.locals.pop();
         }
