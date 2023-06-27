@@ -42,6 +42,12 @@ pub enum CompileStatus {
     Fail
 }
 
+#[derive(Clone, Copy)]
+enum ScopeType {
+    Global,
+    Function
+}
+
 #[derive(Debug)]
 struct Local {
     name: String,
@@ -51,7 +57,6 @@ struct Local {
 
 #[derive(Debug)]
 struct Global {
-    name: String,
     index: usize,
     initialized: bool
 }
@@ -70,6 +75,8 @@ pub struct Compiler<'a> {
 
     locals: Vec<Local>,
     scope_depth: u32,
+    scope_type: ScopeType,
+    scope_stack_index: usize,
 
     had_error: bool,
     panic_mode: bool,
@@ -97,6 +104,8 @@ impl<'a> Compiler<'a> {
 
             locals: Vec::with_capacity(INITIAL_LOCALS_VECTOR_SIZE),
             scope_depth: 0,
+            scope_type: ScopeType::Global,
+            scope_stack_index: 0,
 
             had_error: false,
             panic_mode: false,
@@ -188,6 +197,12 @@ impl<'a> Compiler<'a> {
             if self.found_main {
                 self.compile_error("Cannot have more then 1 main function");
             }
+
+            let old_scope_type = self.scope_type;
+            let old_scope_stack_index = self.scope_stack_index;
+            self.scope_stack_index = self.locals.len();
+            self.scope_type = ScopeType::Function;
+
             self.begin_scope();
 
             self.found_main = true;
@@ -203,11 +218,20 @@ impl<'a> Compiler<'a> {
             self.end_scope();
             self.write_op_code(OpCode::Stop);
             self.patch_jump(jump);
+
+            self.scope_type = old_scope_type;
+            self.scope_stack_index = old_scope_stack_index;
         } else {
             if self.functions.contains_key(&func_name) { // TODO consider adding function
                                                          // overloading
                 self.compile_error(&format!("Function '{}' is already defined.", func_name));
             }
+
+            let old_scope_type = self.scope_type;
+            let old_scope_stack_index = self.scope_stack_index;
+            self.scope_stack_index = self.locals.len();
+            self.scope_type = ScopeType::Function;
+
             self.patch_function(&func_name);
             self.begin_scope();
 
@@ -244,7 +268,10 @@ impl<'a> Compiler<'a> {
             let function_obj = SquatObject::Function(SquatFunction::new(&func_name, starting_index, arity));
             let constant_index = self.constants.write(SquatValue::Object(function_obj));
             self.write_op_code(OpCode::Constant(constant_index));
-            self.define_variable(index, &func_name);
+            self.define_function(index);
+
+            self.scope_type = old_scope_type;
+            self.scope_stack_index = old_scope_stack_index;
         }
     }
 
@@ -294,8 +321,9 @@ impl<'a> Compiler<'a> {
                 }
             }
             let local = Local { name: name.clone(), depth: None };
+            let index = self.locals.len();
             self.locals.push(local);
-            return Ok((0, name));
+            return Ok((index, name));
         }
 
         let var_name = self.previous_token.as_ref().unwrap().lexeme.clone();
@@ -305,20 +333,24 @@ impl<'a> Compiler<'a> {
         }
 
         let index = self.globals.len();
-        let global = Global { name: name.clone(), index, initialized: false };
+        let global = Global { index, initialized: false };
         self.globals.insert(var_name, global);
         Ok((index, name))
     }
 
     fn patch_function(&mut self, name: &str) {
-        println!("Function: {name}");
         if self.scope_depth > 0 {
-            println!("Local");
             self.locals.last_mut().unwrap().depth = Some(self.scope_depth);
             return;
         }
-        println!("Global");
         self.globals.get_mut(name).unwrap().initialized = true;
+    }
+
+    fn define_function(&mut self, index: usize) {
+        if self.scope_depth > 0 {
+            return;
+        }
+        self.write_op_code(OpCode::DefineGlobal(index));
     }
 
     fn define_variable(&mut self, index: usize, name: &str) {
@@ -599,8 +631,8 @@ impl<'a> Compiler<'a> {
         let get_op_code: OpCode;
 
         if let Some(index) = self.resolve_local(&var_name) {
-            set_op_code = OpCode::SetLocal(index);
-            get_op_code = OpCode::GetLocal(index);
+            set_op_code = OpCode::SetLocal(index - self.scope_stack_index);
+            get_op_code = OpCode::GetLocal(index - self.scope_stack_index);
         } else {
             if let Some(index) = self.resolve_global(&var_name) {
                 set_op_code = OpCode::SetGlobal(index);

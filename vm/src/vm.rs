@@ -13,7 +13,7 @@ const INITIAL_CALL_STACK_SIZE: usize = 256;
 
 #[derive(PartialEq)]
 pub enum InterpretResult {
-    InterpretOk,
+    InterpretOk(SquatValue),
     InterpretCompileError,
     InterpretRuntimeError
 }
@@ -264,8 +264,8 @@ impl VM {
                         }
                     },
                     OpCode::Return => {
+                        let return_val = self.stack.pop().unwrap();
                         if let Some(call_frame) = self.call_stack.pop() {
-                            let return_val = self.stack.pop().unwrap();
                             while call_frame.stack_index < self.stack.len() {
                                 self.stack.pop(); // Pop local variables
                             }
@@ -273,13 +273,13 @@ impl VM {
                             self.main_chunk.current_instruction = call_frame.return_address;
                             self.stack.push(return_val);
                         } else {
-                            panic!("Return OpCode must contain a CallFrame in call_stack");
+                            return InterpretResult::InterpretOk(return_val);
                         }
                     },
 
                     OpCode::Start => {},
                     OpCode::Stop => {
-                        return InterpretResult::InterpretOk;
+                        return InterpretResult::InterpretOk(SquatValue::Number(0.));
                     }
                 }
             } else {
@@ -287,7 +287,7 @@ impl VM {
             }
         }
 
-        InterpretResult::InterpretOk
+        InterpretResult::InterpretOk(SquatValue::Number(0.))
     }
 
     fn binary_op<F>(&mut self, op: F)

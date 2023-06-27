@@ -10,10 +10,19 @@ func printHelloThere() {
 }
 
 func exampleFunc(num1, num2) {
+    func inner_inner_inner_func(a) {
+        print "THIS IS INNER INNER EXMPALE FUNC " ++ a;
+    }
+    inner_inner_inner_func(1);
+    inner_inner_inner_func(2);
     print "The sum is";
     print num1 + num2;
     return num1 + num2;
 }
+
+//func exampleFunc(num1, num2) {
+//    print "THIS SHOULD NOT WORK";
+//}
 
 var global_var2 = 20;
 
@@ -96,13 +105,28 @@ func main() {
         print "a is 10";
     }
 
-    func inner_func() {
-        //print "This is the inner func " ++ (a - b);
-        print "This is the inner func ";
+    func inner_func(a, b) {
+        print "This is the inner func " ++ (a - b);
+        //print "This is the inner func ";
+        func inner_inner_func(a) {
+            var meh = 10;
+            print "THIS IS INNER INNER FUNC " ++ (a + meh);
+        }
+        inner_inner_func(1);
+        inner_inner_func(2);
     }
 
-    //inner_func(12, 2);
-    inner_func();
+    inner_func(12, 2);
+
+    {
+        var gigel = 1;
+        {
+            var gigel = 2;
+            print gigel + 123;
+        }
+        var gigel2=2;
+        print gigel+gigel2;
+    }
     var sss = "one two tree";
     print sss;
 }
