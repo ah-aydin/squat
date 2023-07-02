@@ -24,12 +24,12 @@ impl SquatFunction {
 #[derive(Debug, Clone)]
 pub struct SquatNativeFunction {
     pub name: String,
-    pub arity: usize,
+    pub arity: Option<usize>,
     function: NativeFunc
 }
 
 impl SquatNativeFunction {
-    pub fn new(name: &str, arity: usize, function: NativeFunc) -> SquatNativeFunction {
+    pub fn new(name: &str, arity: Option<usize>, function: NativeFunc) -> SquatNativeFunction {
         SquatNativeFunction { name: name.to_string(), arity , function }
     }
 

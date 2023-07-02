@@ -20,10 +20,6 @@ func exampleFunc(num1, num2) {
     return num1 + num2;
 }
 
-//func exampleFunc(num1, num2) {
-//    print "THIS SHOULD NOT WORK";
-//}
-
 var global_var2 = 20;
 
 func rec(i) {
@@ -138,6 +134,8 @@ func main() {
     println("");
     println("this is newline print");
     println("YEYSE");
-}
 
-var global_var4 = 40;
+    println("This", "should", "print", "in a single line with a newline");
+    print("This", "should", "print", "in a single line");
+    print("This", "should", "print", "in a single line");
+}

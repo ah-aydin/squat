@@ -15,11 +15,13 @@ pub fn time(_args: NativeFuncArgs) -> NativeFuncReturnType {
 }
 
 pub fn print(args: NativeFuncArgs) -> NativeFuncReturnType {
-    print!("{}", args[0]);
+    let output = args.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(" ");
+    print!("{}", output);
     Ok(SquatValue::Nil)
 }
 
 pub fn println(args: NativeFuncArgs) -> NativeFuncReturnType {
-    println!("{}", args[0]);
+    let output = args.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(" ");
+    println!("{}", output);
     Ok(SquatValue::Nil)
 }

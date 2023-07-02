@@ -182,11 +182,6 @@ impl VM {
                         }
                     },
 
-                    OpCode::Print => {
-                        if let Some(value) = self.stack.pop() {
-                            println!("{}", value);
-                        }
-                    },
                     OpCode::Pop => {
                         self.stack.pop();
                     },
@@ -301,19 +296,21 @@ impl VM {
                             _ => panic!("Call OpCode expects a FunctionObject on the stack")
                         };
 
-                        if arg_count != native.arity {
-                            self.runtime_error(
-                                &format!(
-                                    "Function takes {} arguments but {} were given",
-                                    native.arity,
-                                    arg_count
-                                    )
-                                );
-                            return InterpretResult::InterpretRuntimeError;
+                        if let Some(arity) = native.arity {
+                            if arg_count != arity {
+                                self.runtime_error(
+                                    &format!(
+                                        "Function takes {} arguments but {} were given",
+                                        arity,
+                                        arg_count
+                                        )
+                                    );
+                                return InterpretResult::InterpretRuntimeError;
+                            }
                         }
 
                         let mut args = Vec::new();
-                        for _i in 0..native.arity {
+                        for _i in 0..arg_count {
                             args.push(self.stack.pop().unwrap())
                         }
                         self.stack.pop().unwrap();
@@ -401,12 +398,12 @@ impl VM {
     }
 
     fn define_native_functions(&mut self) {
-        self.define_native_func("time", 0, crate::native::time);
-        self.define_native_func("print", 1, crate::native::print);
-        self.define_native_func("println", 1, crate::native::println);
+        self.define_native_func("time", Some(0), crate::native::time);
+        self.define_native_func("print", None, crate::native::print);
+        self.define_native_func("println", None, crate::native::println);
     }
 
-    fn define_native_func(&mut self, name: &str, arity: usize, func: NativeFunc) {
+    fn define_native_func(&mut self, name: &str, arity: Option<usize>, func: NativeFunc) {
         let native_func = SquatNativeFunction::new(name, arity, func);
         let native_object = SquatObject::NativeFunction(native_func);
         let native_value = SquatValue::Object(native_object);
