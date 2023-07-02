@@ -16,14 +16,22 @@ impl SquatFunction {
 }
 
 #[derive(Debug, Clone)]
+pub struct SquatNativeFunction {
+    pub name: String,
+    pub arity: usize
+}
+
+#[derive(Debug, Clone)]
 pub enum SquatObject {
-    Function(SquatFunction)
+    Function(SquatFunction),
+    NativeFunction(SquatNativeFunction)
 }
 
 impl ToString for SquatObject {
     fn to_string(&self) -> String {
         match self {
-            SquatObject::Function(func) => format!("<fn {}>", func.name)
+            SquatObject::Function(func) => format!("<func {}>", func.name),
+            SquatObject::NativeFunction(func) => format!("<native func {}>", func.name)
         }
     }
 }
@@ -34,7 +42,12 @@ impl PartialEq for SquatObject {
             (
                 SquatObject::Function(func1), 
                 SquatObject::Function(func2)
-            ) => func1.start_instruction_index == func2.start_instruction_index
+            ) => func1.start_instruction_index == func2.start_instruction_index,
+            (
+                SquatObject::NativeFunction(func1),
+                SquatObject::NativeFunction(func2)
+            ) => func1.name == func2.name,
+            _ => false
         }
     }
 }
