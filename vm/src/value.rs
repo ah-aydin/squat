@@ -1,45 +1,6 @@
 use std::fmt;
 
-#[derive(Debug, Clone)]
-pub struct SquatFunction {
-    pub name: String,
-    pub start_instruction_index: usize,
-    pub arity: usize
-}
-
-impl SquatFunction {
-    pub fn new(name: &str, start_instruction_index: usize, arity: usize) -> SquatFunction {
-        SquatFunction {
-            name: name.to_owned(),
-            start_instruction_index,
-            arity
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum SquatObject {
-    Function(SquatFunction)
-}
-
-impl ToString for SquatObject {
-    fn to_string(&self) -> String {
-        match self {
-            SquatObject::Function(func) => format!("<fn {}>", func.name)
-        }
-    }
-}
-
-impl PartialEq for SquatObject {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (
-                SquatObject::Function(func1), 
-                SquatObject::Function(func2)
-            ) => func1.start_instruction_index == func2.start_instruction_index
-        }
-    }
-}
+use crate::object::SquatObject;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SquatValue {
@@ -128,9 +89,6 @@ impl ValueArray {
     }
 
     pub fn write(&mut self, value: SquatValue) -> usize {
-        // TODO consider storing the indicies in a hash map in the future if things get too slow
-        // It might be faster, for now with small programs, linear search should be faster then
-        // computing the hash
         if let Some(index) = self.values.iter().position(|v| *v == value) {
             if let Some(SquatValue::Object(SquatObject::Function(func))) = self.values.get(index) {
                 println!("Found same squat function {}", func.name);
@@ -139,24 +97,5 @@ impl ValueArray {
         }
         self.values.push(value);
         self.values.len() - 1
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn not_equal_functions() {
-        let val1 = SquatValue::Object(SquatObject::Function(SquatFunction::new("func1", 12, 0)));
-        let val2 = SquatValue::Object(SquatObject::Function(SquatFunction::new("func1", 0, 0)));
-        assert_ne!(val1, val2);
-    }
-
-    #[test]
-    fn equal_functions() {
-        let val1 = SquatValue::Object(SquatObject::Function(SquatFunction::new("func1", 0, 0)));
-        let val2 = SquatValue::Object(SquatObject::Function(SquatFunction::new("func1", 0, 0)));
-        assert_eq!(val1, val2);
     }
 }

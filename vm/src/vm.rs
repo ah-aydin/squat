@@ -4,8 +4,13 @@ use crate::{
     compiler::{
         Compiler,
         CompileStatus
-    }, value::{SquatValue, ValueArray, SquatObject},
-    options::Options
+    },
+    value::{
+        SquatValue,
+        ValueArray
+    },
+    options::Options,
+    object::SquatObject
 };
 
 const INITIAL_STACK_SIZE: usize = 256;

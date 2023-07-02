@@ -1,6 +1,7 @@
 mod chunk;
 mod compiler;
 mod lexer;
+mod object;
 mod op_code;
 mod options;
 mod token;

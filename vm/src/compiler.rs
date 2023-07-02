@@ -2,9 +2,10 @@ use std::collections::HashMap;
 
 use crate::chunk::Chunk;
 use crate::lexer::{Lexer, LexerError};
+use crate::object::{SquatObject, SquatFunction};
 use crate::op_code::OpCode;
 use crate::token::{TokenType, Token};
-use crate::value::{SquatValue, ValueArray, SquatObject, SquatFunction};
+use crate::value::{SquatValue, ValueArray};
 
 const INITIAL_LOCALS_VECTOR_SIZE: usize = 256;
 
