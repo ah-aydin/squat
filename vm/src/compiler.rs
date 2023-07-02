@@ -69,8 +69,8 @@ pub struct Compiler<'a> {
 
     main_chunk: &'a mut Chunk,
 
-    //global_variable_indicies: HashMap<String, usize>,
     globals: HashMap<String, Global>,
+    natives: &'a Vec<SquatValue>,
     constants: &'a mut ValueArray,
 
     locals: Vec<Local>,
@@ -89,7 +89,8 @@ impl<'a> Compiler<'a> {
     pub fn new(
         source: &'a String,
         main_chunk: &'a mut Chunk,
-        constants: &'a mut ValueArray
+        constants: &'a mut ValueArray,
+        natives: &'a Vec<SquatValue>
     ) -> Compiler<'a> {
         Compiler {
             lexer: Lexer::new(source),
@@ -99,6 +100,7 @@ impl<'a> Compiler<'a> {
             main_chunk,
 
             globals: HashMap::new(),
+            natives,
             constants,
 
             locals: Vec::with_capacity(INITIAL_LOCALS_VECTOR_SIZE),
@@ -233,7 +235,10 @@ impl<'a> Compiler<'a> {
             let mut arity = 0;
             if !self.check_current(TokenType::RightParenthesis) {
                 arity += 1;
-                let (constant, var_name) = self.parse_variable("Expect parameter name").unwrap();
+                let (constant, var_name) = match self.parse_variable("Expect parameter name") {
+                    Ok((constant, var_name)) => (constant, var_name),
+                    Err(_) => return,
+                };
                 self.define_variable(constant, &var_name);
 
                 while self.check_current(TokenType::Comma) {
@@ -241,7 +246,10 @@ impl<'a> Compiler<'a> {
                     if arity > 255 {
                         self.compile_error("Can't have more then 255 parameters on a function");
                     }
-                    let (constant, var_name) = self.parse_variable("Expect parameter name").unwrap();
+                    let (constant, var_name) = match self.parse_variable("Expect parameter name") {
+                        Ok((constant, var_name)) => (constant, var_name),
+                        Err(_) => return,
+                    };
                     self.define_variable(constant, &var_name);
                 }
                 self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
@@ -296,6 +304,12 @@ impl<'a> Compiler<'a> {
         self.consume_current(TokenType::Identifier, error_msg);
 
         let name = self.previous_token.as_ref().unwrap().lexeme.clone();
+
+        if let Some(_) = self.resolve_native(&name) {
+            self.compile_error(&format!("'{}' is a native object", name));
+            return Err(());
+        }
+
         if self.scope_depth > 0 {
             for i in (0..self.locals.len()).rev() {
                 if let Some(depth) = self.locals[i].depth {
@@ -312,7 +326,8 @@ impl<'a> Compiler<'a> {
                             &self.scope_depth
                         )
                     );
-                    return Ok((0, name));
+                    //return Ok((0, name));
+                    return Err(());
                 }
             }
             let local = Local { name: name.clone(), depth: None };
@@ -630,17 +645,28 @@ impl<'a> Compiler<'a> {
         if let Some(index) = self.resolve_local(&var_name) {
             set_op_code = OpCode::SetLocal(index - self.scope_stack_index);
             get_op_code = OpCode::GetLocal(index - self.scope_stack_index);
-        } else {
-            if let Some(index) = self.resolve_global(&var_name) {
-                set_op_code = OpCode::SetGlobal(index);
-                get_op_code = OpCode::GetGlobal(index);
-            } else {
-                self.compile_error(&format!("{} is not defined.", var_name));
-                return;
-            }
+        } else if let Some(index) = self.resolve_global(&var_name) {
+            set_op_code = OpCode::SetGlobal(index);
+            get_op_code = OpCode::GetGlobal(index);
+        } else if let Some(index) = self.resolve_native(&var_name) {
+            set_op_code = OpCode::Nil; // Just to keep the compiler happy
+            get_op_code = OpCode::GetNative(index);
+        }
+        else {
+            self.compile_error(&format!("{} is not defined.", var_name));
+            return;
         }
 
         if self.check_current(TokenType::Equal) {
+            if let OpCode::GetNative(_) = get_op_code {
+                self.compile_error(
+                    &format!(
+                        "Cannot change assignment of native object '{}'",
+                        var_name
+                    )
+                );
+                return;
+            }
             self.expression();
             self.write_op_code(set_op_code);
         } else {
@@ -752,6 +778,16 @@ impl<'a> Compiler<'a> {
             self.write_op_code(OpCode::Pop);
             self.locals.pop();
         }
+    }
+
+    fn resolve_native(&mut self, name: &str) -> Option<usize> {
+        if let Some(native) = self.natives.iter().position(|x| match x {
+            SquatValue::Object(SquatObject::NativeFunction(func)) => func.name == name,
+            _ => unreachable!()
+        }) {
+            return Some(native);
+        }
+        None
     }
 
     fn resolve_global(&mut self, name: &str) -> Option<usize> {

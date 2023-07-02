@@ -10,7 +10,7 @@ use crate::{
         ValueArray
     },
     options::Options,
-    object::SquatObject
+    object::{SquatObject, NativeFuncType, SquatNativeFunction}
 };
 
 const INITIAL_STACK_SIZE: usize = 256;
@@ -43,6 +43,7 @@ pub struct VM {
     stack: Vec<SquatValue>,
     call_stack: Vec<CallFrame>,
     globals: Vec<Option<SquatValue>>,
+    natives: Vec<SquatValue>,
     constants: ValueArray,
     main_chunk: Chunk,
     had_error: bool
@@ -54,6 +55,7 @@ impl VM {
             stack: Vec::with_capacity(INITIAL_STACK_SIZE),
             call_stack: Vec::with_capacity(INITIAL_CALL_STACK_SIZE),
             globals: vec![None; 1],
+            natives: Vec::with_capacity(255),
             constants: ValueArray::new("Constants"),
             main_chunk: Chunk::new("Main"),
             had_error: false
@@ -61,10 +63,12 @@ impl VM {
     }
 
     pub fn interpret_source(&mut self, source: String, opts: &Options) -> InterpretResult {
+        self.define_native_functions();
         let mut compiler = Compiler::new(
             &source,
             &mut self.main_chunk,
-            &mut self.constants
+            &mut self.constants,
+            &self.natives
         );
         let compile_status = compiler.compile();
 
@@ -233,6 +237,10 @@ impl VM {
                         }
                     },
 
+                    OpCode::GetNative(index) => {
+                        self.stack.push(self.natives[*index].clone());
+                    },
+
                     OpCode::JumpTo(instruction_number) => {
                         self.main_chunk.current_instruction = *instruction_number;
                     }
@@ -264,33 +272,42 @@ impl VM {
                     OpCode::Call(arg_count) => {
                         let arg_count = *arg_count;
                         let func_data_location = self.stack.len() - 1 - arg_count;
-                        if let Some(SquatValue::Object(
-                                SquatObject::Function(func_data)
-                            )) = self.stack.get(func_data_location) {
-                            if arg_count != func_data.arity {
-                                self.runtime_error(
-                                    &format!(
-                                        "Function takes {} arguments but {} were given",
-                                        func_data.arity,
-                                        arg_count
-                                    )
-                                );
-                                return InterpretResult::InterpretRuntimeError;
-                            }
-                            let return_address = self.main_chunk.current_instruction;
-                            self.call_stack.push(
-                                CallFrame::new(
-                                    self.stack.len() - arg_count,
-                                    return_address,
-                                    func_data.name.clone()
-                                )
-                            );
-                            self.main_chunk.current_instruction = func_data.start_instruction_index;
-                        } else {
-                            panic!(
-                                "Call OpCode expects a SquatValue::Object(SquatObject::Function(SquatFunction)) value on the stack"
-                            );
+                        // All this ugly code for the native stuff exists because of the
+                        // borrow checker.
+                        let native = match self.stack.get(func_data_location).unwrap() {
+                            SquatValue::Object(SquatObject::Function(func_data)) => {
+                                if arg_count != func_data.arity {
+                                    self.runtime_error(
+                                        &format!(
+                                            "Function takes {} arguments but {} were given",
+                                            func_data.arity,
+                                            arg_count
+                                            )
+                                        );
+                                    return InterpretResult::InterpretRuntimeError;
+                                }
+                                let return_address = self.main_chunk.current_instruction;
+                                self.call_stack.push(
+                                    CallFrame::new(
+                                        self.stack.len() - arg_count,
+                                        return_address,
+                                        func_data.name.clone()
+                                        )
+                                    );
+                                self.main_chunk.current_instruction = func_data.start_instruction_index;
+                                continue;
+                            },
+                            SquatValue::Object(SquatObject::NativeFunction(func)) => func.clone(),
+                            _ => panic!("Call OpCode expects a FunctionObject on the stack")
+                        };
+
+                        let mut args = Vec::new();
+                        for _i in 0..native.arity {
+                            args.push(self.stack.pop().unwrap())
                         }
+                        self.stack.pop().unwrap();
+                        args.reverse();
+                        self.stack.push(native.call(args));
                     },
                     OpCode::Return => {
                         let return_val = self.stack.pop().unwrap();
@@ -367,5 +384,16 @@ impl VM {
             message
         );
         self.had_error = true;
+    }
+
+    fn define_native_functions(&mut self) {
+        self.define_native_func("time", 0, crate::native::time);
+    }
+
+    fn define_native_func(&mut self, name: &str, arity: usize, func: NativeFuncType) {
+        let native_func = SquatNativeFunction::new(name, arity, func);
+        let native_object = SquatObject::NativeFunction(native_func);
+        let native_value = SquatValue::Object(native_object);
+        self.natives.push(native_value);
     }
 }

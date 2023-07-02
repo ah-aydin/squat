@@ -56,6 +56,8 @@ func test_pass_func(fun) {
 var global_var3 = 30;
 
 func main() {
+    var start_time = time();
+    
     test_pass_func(printHelloThere);
     for (var i = 0; i < 15; i = i + 1) {
         var odd = is_odd(i) ? "yes" : "no";
@@ -66,7 +68,6 @@ func main() {
 
     print rec;
     rec(10);
-
     var rec2 = rec;
     rec2(20);
 
@@ -128,6 +129,9 @@ func main() {
     }
     var sss = "one two tree";
     print sss;
+
+    var end_time = time();
+    print "The program took " ++ (end_time - start_time) ++ " seconds.";
 }
 
 var global_var4 = 40;
