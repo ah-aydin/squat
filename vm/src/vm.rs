@@ -10,7 +10,7 @@ use crate::{
         ValueArray
     },
     options::Options,
-    object::{SquatObject, NativeFuncType, SquatNativeFunction}
+    object::{SquatObject, NativeFunc, SquatNativeFunction}
 };
 
 const INITIAL_STACK_SIZE: usize = 256;
@@ -390,7 +390,7 @@ impl VM {
         self.define_native_func("time", 0, crate::native::time);
     }
 
-    fn define_native_func(&mut self, name: &str, arity: usize, func: NativeFuncType) {
+    fn define_native_func(&mut self, name: &str, arity: usize, func: NativeFunc) {
         let native_func = SquatNativeFunction::new(name, arity, func);
         let native_object = SquatObject::NativeFunction(native_func);
         let native_value = SquatValue::Object(native_object);
