@@ -43,7 +43,7 @@ fn run_file(opts: &Options) -> Result<(),()> {
             }
         };
 
-        println!("Exit code: {exit_code}");
+        println!("\nExit code: {exit_code}");
     }
     
     return Ok(());

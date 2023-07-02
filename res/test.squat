@@ -138,4 +138,6 @@ func main() {
     println("This", "should", "print", "in a single line with a newline");
     print("This", "should", "print", "in a single line");
     print("This", "should", "print", "in a single line");
+    println();
+    print("This", "should", "print", "in a single line");
 }
