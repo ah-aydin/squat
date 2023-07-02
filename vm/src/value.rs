@@ -50,13 +50,7 @@ impl fmt::Display for SquatValue {
             SquatValue::Number(value)   => write!(f, "{}", value),
             SquatValue::Bool(value)     => write!(f, "{}", value),
             SquatValue::String(value)   => write!(f, "{}", value),
-            SquatValue::Object(object)  => {
-                match object {
-                    SquatObject::Function(func) => {
-                        write!(f, "<fn {}>", func.name)
-                    }
-                }
-            }
+            SquatValue::Object(object)  => write!(f, "{}", object.to_string())
         }
     }
 }
