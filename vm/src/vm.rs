@@ -11,7 +11,11 @@ use crate::{
     },
     native,
     options::Options,
-    object::{SquatObject, NativeFunc, SquatNativeFunction}
+    object::{
+        SquatObject,
+        NativeFunc,
+        SquatNativeFunction
+    }
 };
 
 const INITIAL_STACK_SIZE: usize = 256;
