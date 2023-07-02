@@ -1,4 +1,3 @@
-//var global_var = 10 + global_var;
 var global_var = 10;
 
 func printHelloThere() {
@@ -50,6 +49,10 @@ func test_pass_func(fun) {
 }
 
 var global_var3 = 30;
+    
+func print_cube_and_square_root(num1) {
+    println("The sqrt and cbrt of", num1, "is", sqrt(num1), "and", cbrt(num1));
+}
 
 func main() {
     var start_time = time();
@@ -125,9 +128,6 @@ func main() {
     var sss = "one two tree";
     println(sss);
 
-    var end_time = time();
-    println("The program took " ++ (end_time - start_time) ++ " seconds.");
-
     print("This is no new line print");
     print("ASDASDA");
     println("");
@@ -149,4 +149,10 @@ func main() {
     println("Gib number 2");
     var num2 = number(input());
     println(val, num1 + num2);
+
+    print_cube_and_square_root(num1);
+    println("10 to the power of 3 is", pow(10, 3));
+
+    var end_time = time();
+    println("The program took ", end_time - start_time, " seconds.");
 }

@@ -9,6 +9,7 @@ use crate::{
         SquatValue,
         ValueArray
     },
+    native,
     options::Options,
     object::{SquatObject, NativeFunc, SquatNativeFunction}
 };
@@ -399,12 +400,18 @@ impl VM {
 
     fn define_native_functions(&mut self) {
         // I/O
-        self.define_native_func("input", Some(0), crate::native::input);
-        self.define_native_func("print", None, crate::native::print);
-        self.define_native_func("println", None, crate::native::println);
+        self.define_native_func("input", Some(0), native::io::input);
+        self.define_native_func("print", None, native::io::print);
+        self.define_native_func("println", None, native::io::println);
 
-        self.define_native_func("number", Some(1), crate::native::number);
-        self.define_native_func("time", Some(0), crate::native::time);
+        // Number
+        self.define_native_func("cbrt", Some(1), native::number::cbrt);
+        self.define_native_func("sqrt", Some(1), native::number::sqrt);
+        self.define_native_func("pow", Some(2), native::number::pow);
+        self.define_native_func("number", Some(1), native::number::number);
+
+        // Misc
+        self.define_native_func("time", Some(0), native::misc::time);
     }
 
     fn define_native_func(&mut self, name: &str, arity: Option<usize>, func: NativeFunc) {
