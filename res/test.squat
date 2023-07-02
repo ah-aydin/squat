@@ -30,15 +30,15 @@ func rec(i) {
     rec(i-1);
 }
 
-func is_odd(number) {
-    if (number % 2 == 0) {
+func is_odd(num) {
+    if (num % 2 == 0) {
         return false;
     }
     return true;
 }
 
-func is_even(number) {
-    return number % 2 == 0;
+func is_even(num) {
+    return num % 2 == 0;
 }
 
 func test_pass_func(fun) {
@@ -81,9 +81,8 @@ func main() {
     }
     
     for (var i = 0; i < 10; i = i + 3) {
-        print(i);
+        println(i);
     }
-
 
     println("Not true is " ++ !true);
 
@@ -140,4 +139,14 @@ func main() {
     print("This", "should", "print", "in a single line");
     println();
     print("This", "should", "print", "in a single line");
+    println();
+
+    // Test input
+    println("Gib string");
+    var val = input();
+    println("Gib number");
+    var num1 = number(input());
+    println("Gib number 2");
+    var num2 = number(input());
+    println(val, num1 + num2);
 }

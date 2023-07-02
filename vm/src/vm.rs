@@ -398,9 +398,13 @@ impl VM {
     }
 
     fn define_native_functions(&mut self) {
-        self.define_native_func("time", Some(0), crate::native::time);
+        // I/O
+        self.define_native_func("input", Some(0), crate::native::input);
         self.define_native_func("print", None, crate::native::print);
         self.define_native_func("println", None, crate::native::println);
+
+        self.define_native_func("number", Some(1), crate::native::number);
+        self.define_native_func("time", Some(0), crate::native::time);
     }
 
     fn define_native_func(&mut self, name: &str, arity: Option<usize>, func: NativeFunc) {

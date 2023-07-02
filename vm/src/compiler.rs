@@ -298,8 +298,12 @@ impl<'a> Compiler<'a> {
     }
 
     /// Return value:
-    /// If local  -> (0, variable_name: String)
-    /// If global -> (global_index: usize, variable_name: String)
+    /// ```rust
+    /// // If local
+    /// Ok(0, variable_name: String)
+    /// // If global
+    /// Ok(global_index: usize, variable_name: String)
+    /// ```
     fn parse_variable(&mut self, error_msg: &str) -> Result<(usize, String), ()> {
         self.consume_current(TokenType::Identifier, error_msg);
 
@@ -873,10 +877,6 @@ impl<'a> Compiler<'a> {
         let line = self.previous_token.as_ref().unwrap().line;
         self.main_chunk.write(op_code, line);
         return;
-        // match self.chunk_mode {
-        //     ChunkMode::Main => self.main_chunk.write(op_code, line),
-        //     ChunkMode::Global => self.global_var_decl_chunk.write(op_code, line)
-        // };
     }
 
     //////////////////////////////////////////////////////////////////////////
