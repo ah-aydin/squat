@@ -301,13 +301,27 @@ impl VM {
                             _ => panic!("Call OpCode expects a FunctionObject on the stack")
                         };
 
+                        if arg_count != native.arity {
+                            self.runtime_error(
+                                &format!(
+                                    "Function takes {} arguments but {} were given",
+                                    native.arity,
+                                    arg_count
+                                    )
+                                );
+                            return InterpretResult::InterpretRuntimeError;
+                        }
+
                         let mut args = Vec::new();
                         for _i in 0..native.arity {
                             args.push(self.stack.pop().unwrap())
                         }
                         self.stack.pop().unwrap();
                         args.reverse();
-                        self.stack.push(native.call(args));
+                        match native.call(args) {
+                            Ok(value) => self.stack.push(value),
+                            Err(msg) => self.runtime_error(&msg)
+                        };
                     },
                     OpCode::Return => {
                         let return_val = self.stack.pop().unwrap();
@@ -388,6 +402,8 @@ impl VM {
 
     fn define_native_functions(&mut self) {
         self.define_native_func("time", 0, crate::native::time);
+        self.define_native_func("print", 1, crate::native::print);
+        self.define_native_func("println", 1, crate::native::println);
     }
 
     fn define_native_func(&mut self, name: &str, arity: usize, func: NativeFunc) {

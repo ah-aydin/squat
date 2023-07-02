@@ -384,9 +384,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn statement(&mut self) {
-        if self.check_current(TokenType::Print) {
-            self.print_statement()
-        } else if self.check_current(TokenType::If) {
+        if self.check_current(TokenType::If) {
             self.if_statement();
         } else if self.check_current(TokenType::While) {
             self.while_statement();
@@ -399,12 +397,6 @@ impl<'a> Compiler<'a> {
         } else {
             self.expression_statement();
         }
-    }
-
-    fn print_statement(&mut self) {
-        self.expression();
-        self.consume_current(TokenType::Semicolon, "Expect ';' after value.");
-        self.write_op_code(OpCode::Print);
     }
 
     fn if_statement(&mut self) {
@@ -746,7 +738,7 @@ impl<'a> Compiler<'a> {
         while self.current_token.as_ref().unwrap().token_type != TokenType::Eof {
             match self.current_token.as_ref().unwrap().token_type {
                 TokenType::Class | TokenType::Func | TokenType::Var | TokenType::For |
-                    TokenType::If | TokenType::While | TokenType::Print |
+                    TokenType::If | TokenType::While |
                     TokenType::Return => {
                         break;
                     },

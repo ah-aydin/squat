@@ -2,21 +2,21 @@
 var global_var = 10;
 
 func printHelloThere() {
-    print "hello there";
+    println("hello there");
     var g1 = "123123";
     var g2 = "12312312321";
-    print g1 ++ g2;
+    println(g1 ++ g2);
     return -88;
 }
 
 func exampleFunc(num1, num2) {
     func inner_inner_func(a) {
-        print "THIS IS INNER INNER EXMPALE FUNC " ++ a;
+        println("THIS IS INNER INNER EXMPALE FUNC " ++ a);
     }
     inner_inner_func(1);
     inner_inner_func(2);
-    print "The sum is";
-    print num1 + num2;
+    println("The sum is");
+    println(num1 + num2);
     return num1 + num2;
 }
 
@@ -30,7 +30,7 @@ func rec(i) {
     if (i <= 0) {
         return;
     }
-    print "Rec " ++ rec ++ " " ++ i;
+    println("Rec " ++ rec ++ " " ++ i);
     rec(i-1);
 }
 
@@ -46,11 +46,11 @@ func is_even(number) {
 }
 
 func test_pass_func(fun) {
-    print test_pass_func;
-    print fun;
+    println(test_pass_func);
+    print(fun);
     fun();
-    print fun;
-    print test_pass_func;
+    print(fun);
+    print(test_pass_func);
 }
 
 var global_var3 = 30;
@@ -61,56 +61,56 @@ func main() {
     test_pass_func(printHelloThere);
     for (var i = 0; i < 15; i = i + 1) {
         var odd = is_odd(i) ? "yes" : "no";
-        print i ++ " is odd " ++ odd;
+        println(i ++ " is odd " ++ odd);
         var even = is_even (i) ? "yes" : "no";
-        print i ++ " is even " ++ even;
+        println(i ++ " is even " ++ even);
     }
 
-    print rec;
+    println(rec);
     rec(10);
     var rec2 = rec;
     rec2(20);
 
-    print "The number is " ++ 1230;
+    println("The number is " ++ 1230);
     if (1 == 1) {
-        print "hello there";
+        println("hello there");
     } else {
-        print "goodbye";
+        println("goodbye");
     }
 
     var i = 0;
     while (i < 5) {
-        print i;
+        println(i);
         i = i + 1;
     }
     
     for (var i = 0; i < 10; i = i + 3) {
-        print i;
+        print(i);
     }
 
 
-    print "Not true is " ++ !true;
+    println("Not true is " ++ !true);
 
     var e = printHelloThere();
-    print e + 10;
+    println(e + 10);
     var a = 5;
-    print a;
+    println(a);
     exampleFunc(exampleFunc(900, exampleFunc(80, 10)), 9);
     exampleFunc(a, 90);
-    print a + 123123;
+    println(a + 123123);
 
     if (a == 5) {
-        print "a is 5";
+        println("a is 5");
     }
     if (a == 10) {
-        print "a is 10";
+        println("a is 10");
     }
 
     func inner_func(a, b) {
-        print "This is the inner func " ++ (a - b);
+        println("This is the inner func " ++ (a - b));
         func inner_inner_func(a) {
             var meh = 10;
-            print "THIS IS INNER INNER FUNC " ++ (a + meh);
+            println("THIS IS INNER INNER FUNC " ++ (a + meh));
         }
         inner_inner_func(1);
         inner_inner_func(2);
@@ -122,16 +122,22 @@ func main() {
         var gigel = 1;
         {
             var gigel = 2;
-            print gigel + 123;
+            println(gigel + 123);
         }
         var gigel2=2;
-        print gigel+gigel2;
+        println(gigel+gigel2);
     }
     var sss = "one two tree";
-    print sss;
+    println(sss);
 
     var end_time = time();
-    print "The program took " ++ (end_time - start_time) ++ " seconds.";
+    println("The program took " ++ (end_time - start_time) ++ " seconds.");
+
+    print("This is no new line print");
+    print("ASDASDA");
+    println("");
+    println("this is newline print");
+    println("YEYSE");
 }
 
 var global_var4 = 40;

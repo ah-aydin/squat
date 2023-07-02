@@ -1,8 +1,8 @@
 use crate::value::SquatValue;
 
 pub type NativeFuncArgs = Vec<SquatValue>;
-pub type NativeFuncReturnType = SquatValue;
-pub type NativeFunc = fn(NativeFuncArgs) -> SquatValue;
+pub type NativeFuncReturnType = Result<SquatValue, String>;
+pub type NativeFunc = fn(NativeFuncArgs) -> NativeFuncReturnType;
 
 #[derive(Debug, Clone)]
 pub struct SquatFunction {
@@ -33,7 +33,7 @@ impl SquatNativeFunction {
         SquatNativeFunction { name: name.to_string(), arity , function }
     }
 
-    pub fn call(&self, args: NativeFuncArgs) -> SquatValue {
+    pub fn call(&self, args: NativeFuncArgs) -> NativeFuncReturnType {
         (self.function)(args)
     }
 }

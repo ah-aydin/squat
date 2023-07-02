@@ -263,7 +263,6 @@ impl<'a> Lexer<'a> {
                 "if" =>         Some(self.make_token(TokenType::If)),
                 "nil" =>        Some(self.make_token(TokenType::Nil)),
                 "or" =>         Some(self.make_token(TokenType::Or)),
-                "print" =>      Some(self.make_token(TokenType::Print)),
                 "return" =>     Some(self.make_token(TokenType::Return)),
                 "static" =>     Some(self.make_token(TokenType::Static)),
                 "super" =>      Some(self.make_token(TokenType::Super)),
@@ -447,7 +446,6 @@ mod test {
         assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::If, "if"));
         assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Nil, "nil"));
         assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Or, "or"));
-        assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Print, "print"));
         assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Return, "return"));
         assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Static, "static"));
         assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Super, "super"));
