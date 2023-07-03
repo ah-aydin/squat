@@ -1,10 +1,5 @@
-use crate::{
-    object::{
-        NativeFuncArgs,
-        NativeFuncReturnType
-    },
-    value::SquatValue
-};
+use super::*;
+use crate::value::SquatValue;
 
 pub fn cbrt(args: NativeFuncArgs) -> NativeFuncReturnType {
     match &args[0] {

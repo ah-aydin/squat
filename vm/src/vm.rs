@@ -13,7 +13,6 @@ use crate::{
     options::Options,
     object::{
         SquatObject,
-        NativeFunc,
         SquatNativeFunction
     }
 };
@@ -50,7 +49,8 @@ pub struct VM {
     globals: Vec<Option<SquatValue>>,
     natives: Vec<SquatValue>,
     constants: ValueArray,
-    main_chunk: Chunk,
+    current_chunk: usize,
+    chunks: Vec<Chunk>,
     had_error: bool
 }
 
@@ -62,7 +62,8 @@ impl VM {
             globals: vec![None; 1],
             natives: Vec::with_capacity(255),
             constants: ValueArray::new("Constants"),
-            main_chunk: Chunk::new("Main"),
+            current_chunk: 0,
+            chunks: vec![Chunk::new("Main", true)],
             had_error: false
         }
     }
@@ -71,7 +72,7 @@ impl VM {
         self.define_native_functions();
         let mut compiler = Compiler::new(
             &source,
-            &mut self.main_chunk,
+            &mut self.chunks[0],
             &mut self.constants,
             &self.natives
         );
@@ -80,7 +81,7 @@ impl VM {
         drop(compiler);
         if opts.log_byte_code {
             println!("---------------- INSTRUCTIONS ----------------");
-            self.main_chunk.disassemble();
+            self.chunks.iter().for_each(|chunk| chunk.disassemble());
             println!("----------------------------------------------");
         }
 
@@ -90,7 +91,7 @@ impl VM {
                 self.call_stack.push(
                     CallFrame::new(
                         0,
-                        self.main_chunk.get_main_start(),
+                        self.chunks[0].get_main_start(),
                         "main".to_owned()
                     )
                 );
@@ -100,12 +101,12 @@ impl VM {
             CompileStatus::Fail => InterpretResult::InterpretCompileError
         };
 
-        self.main_chunk.clear_instructions();
+        self.chunks[self.current_chunk].clear_instructions();
         interpret_result
     }
 
     fn interpret_chunk(&mut self, starting_instruction: usize, opts: &Options) -> InterpretResult {
-        self.main_chunk.current_instruction = starting_instruction;
+        self.chunks[self.current_chunk].current_instruction = starting_instruction;
 
         loop {
             if opts.log_stack {
@@ -124,14 +125,14 @@ impl VM {
             }
 
             if opts.log_insturctions {
-                self.main_chunk.disassemble_current_instruction();
+                self.chunks[self.current_chunk].disassemble_current_instruction();
             }
 
             if self.had_error {
                 return InterpretResult::InterpretRuntimeError;
             }
 
-            if let Some(instruction) = self.main_chunk.next() {
+            if let Some(instruction) = self.chunks[self.current_chunk].next() {
                 match instruction {
                     OpCode::Constant(index) => {
                         let index = *index;
@@ -242,31 +243,31 @@ impl VM {
                     },
 
                     OpCode::JumpTo(instruction_number) => {
-                        self.main_chunk.current_instruction = *instruction_number;
+                        self.chunks[self.current_chunk].current_instruction = *instruction_number;
                     }
                     OpCode::JumpIfFalse(offset) => {
                         if let Some(value) = self.stack.last() {
                             if !value.is_truthy() {
-                                self.main_chunk.current_instruction += *offset;
+                                self.chunks[self.current_chunk].current_instruction += *offset;
                             }
                         } else {
                             panic!("JumpIfFalse OpCode expect a value to be on the stack");
                         }
                     },
                     OpCode::Jump(offset) => {
-                        self.main_chunk.current_instruction += *offset;
+                        self.chunks[self.current_chunk].current_instruction += *offset;
                     },
                     OpCode::JumpIfTrue(offset) => {
                         if let Some(value) = self.stack.last() {
                             if value.is_truthy() {
-                                self.main_chunk.current_instruction += *offset;
+                                self.chunks[self.current_chunk].current_instruction += *offset;
                             }
                         } else {
                             panic!("JumpIfTrue OpCode expect a value to be on the stack");
                         }
                     },
                     OpCode::Loop(loop_start) => {
-                        self.main_chunk.current_instruction = *loop_start;
+                        self.chunks[self.current_chunk].current_instruction = *loop_start;
                     },
 
                     OpCode::Call(arg_count) => {
@@ -286,7 +287,7 @@ impl VM {
                                         );
                                     return InterpretResult::InterpretRuntimeError;
                                 }
-                                let return_address = self.main_chunk.current_instruction;
+                                let return_address = self.chunks[self.current_chunk].current_instruction;
                                 self.call_stack.push(
                                     CallFrame::new(
                                         self.stack.len() - arg_count,
@@ -294,7 +295,7 @@ impl VM {
                                         func_data.name.clone()
                                         )
                                     );
-                                self.main_chunk.current_instruction = func_data.start_instruction_index;
+                                self.chunks[self.current_chunk].current_instruction = func_data.start_instruction_index;
                                 continue;
                             },
                             SquatValue::Object(SquatObject::NativeFunction(func)) => func.clone(),
@@ -332,7 +333,7 @@ impl VM {
                                 self.stack.pop(); // Pop local variables
                             }
                             self.stack.pop(); // Pop SquatFunc
-                            self.main_chunk.current_instruction = call_frame.return_address;
+                            self.chunks[self.current_chunk].current_instruction = call_frame.return_address;
                             self.stack.push(return_val);
                         } else {
                             return InterpretResult::InterpretOk(return_val);
@@ -391,34 +392,31 @@ impl VM {
             println!(
                 "\tfunction '{}' called at line {}",
                 call_frame.func_name,
-                self.main_chunk.get_instruction_line(call_frame.return_address)
+                self.chunks[self.current_chunk].get_instruction_line(call_frame.return_address)
             );
         }
         println!(
             "[ERROR] (Line {}) {}",
-            self.main_chunk.get_current_instruction_line(),
+            self.chunks[self.current_chunk].get_current_instruction_line(),
             message
         );
         self.had_error = true;
     }
 
     fn define_native_functions(&mut self) {
-        // I/O
         self.define_native_func("input", Some(0), native::io::input);
         self.define_native_func("print", None, native::io::print);
         self.define_native_func("println", None, native::io::println);
 
-        // Number
         self.define_native_func("cbrt", Some(1), native::number::cbrt);
         self.define_native_func("sqrt", Some(1), native::number::sqrt);
         self.define_native_func("pow", Some(2), native::number::pow);
         self.define_native_func("number", Some(1), native::number::number);
 
-        // Misc
         self.define_native_func("time", Some(0), native::misc::time);
     }
 
-    fn define_native_func(&mut self, name: &str, arity: Option<usize>, func: NativeFunc) {
+    fn define_native_func(&mut self, name: &str, arity: Option<usize>, func: native::NativeFunc) {
         let native_func = SquatNativeFunction::new(name, arity, func);
         let native_object = SquatObject::NativeFunction(native_func);
         let native_value = SquatValue::Object(native_object);

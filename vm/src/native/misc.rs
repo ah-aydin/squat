@@ -1,12 +1,5 @@
+use super::*;
 use std::time::{SystemTime, UNIX_EPOCH};
-
-use crate::{
-    object::{
-        NativeFuncArgs,
-        NativeFuncReturnType
-    },
-    value::SquatValue
-};
 
 pub fn time(_args: NativeFuncArgs) -> NativeFuncReturnType {
     let now = SystemTime::now();

@@ -1,8 +1,8 @@
-use crate::value::SquatValue;
-
-pub type NativeFuncArgs = Vec<SquatValue>;
-pub type NativeFuncReturnType = Result<SquatValue, String>;
-pub type NativeFunc = fn(NativeFuncArgs) -> NativeFuncReturnType;
+use crate::native::{
+    NativeFunc,
+    NativeFuncArgs,
+    NativeFuncReturnType
+};
 
 #[derive(Debug, Clone)]
 pub struct SquatFunction {

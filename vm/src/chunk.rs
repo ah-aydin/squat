@@ -25,26 +25,29 @@ pub struct Chunk {
     code: Vec<OpCode>,
     pub current_instruction: usize,
     lines: Vec<Line>,
+    is_main_chunk: bool
 }
 
 impl Chunk {
-    pub fn new(name: &str) -> Chunk {
+    pub fn new(name: &str, is_main_chunk: bool) -> Chunk {
         Chunk {
             name: String::from(name) + " Chunk",
             code: Vec::new(),
             current_instruction: 0,
             lines: Vec::new(),
+            is_main_chunk
         }
     }
 
     pub fn disassemble(&self) {
-        println!("==== {} ====", self.name);
+        println!("==== Begin: {} ====", self.name);
 
         let mut op_index: usize = 0;
         while op_index < self.code.len() {
             let op_code = &self.code[op_index];
             op_index = self.disassemble_instruction(op_code, op_index);
         }
+        println!("==== End:   {} ====", self.name);
     }
 
     pub fn disassemble_current_instruction(&self) {
@@ -61,6 +64,9 @@ impl Chunk {
     }
 
     pub fn get_main_start(&self) -> usize {
+        if !self.is_main_chunk {
+            panic!("Trying to find main function in non-main chunk");
+        }
         if let OpCode::JumpTo(main_start) = self.code.last().unwrap() {
             return *main_start - 1;
         }
