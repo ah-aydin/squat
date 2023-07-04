@@ -157,22 +157,6 @@ impl VM {
                     OpCode::Less            => self.binary_cmp(|left, right| left < right),
                     OpCode::LessEqual       => self.binary_cmp(|left, right| left <= right),
 
-                    OpCode::Concat => {
-                        let right = self.stack.pop();
-                        let left = self.stack.pop();
-
-                        if left.is_some() && right.is_some() {
-                            self.stack.push(
-                                SquatValue::String(
-                                    left.unwrap().to_string() + &right.unwrap().to_string()
-                                )
-                            );
-                        } else {
-                            panic!("Concat operation requires 2 values in the stack");
-                        }
-                    },
-
-
                     OpCode::Not => {
                         if let Some(value) = self.stack.pop() {
                             self.stack.push(SquatValue::Bool(!value.is_truthy()));

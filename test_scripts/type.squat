@@ -10,7 +10,7 @@ func main() {
     if (1 == 2) {
         println("1 is 2");
     } else {
-        println("1 is not 2");
+        println("1 is" + " not 2");
     }
     var meh = !c;
     println(meh, type(meh));

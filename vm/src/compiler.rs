@@ -604,7 +604,6 @@ impl<'a> Compiler<'a> {
 
         match token_type {
             TokenType::Plus             => self.write_op_code(OpCode::Add),
-            TokenType::PlusPlus         => self.write_op_code(OpCode::Concat),
             TokenType::Minus            => self.write_op_code(OpCode::Subtract),
             TokenType::Star             => self.write_op_code(OpCode::Multiply),
             TokenType::Slash            => self.write_op_code(OpCode::Divide),
@@ -939,7 +938,7 @@ impl<'a> Compiler<'a> {
     fn call_infix(&mut self, token_type: TokenType, expected_type: Option<SquatType>) -> SquatType {
         match token_type {
             TokenType::Minus | TokenType::Plus | TokenType::Slash | TokenType::Star |
-                TokenType::PlusPlus | TokenType::Percent |
+                TokenType::Percent |
                 TokenType::BangEqual | TokenType::EqualEqual |
                 TokenType::Greater | TokenType::GreaterEqual |
                 TokenType::Less | TokenType::LessEqual => self.binary(expected_type),
@@ -952,7 +951,7 @@ impl<'a> Compiler<'a> {
 
     fn get_precedence(&self, token_type: TokenType) -> Precedence {
         match token_type {
-            TokenType::Plus | TokenType::PlusPlus |
+            TokenType::Plus |
                 TokenType::Minus | TokenType::Percent => Precedence::Term,
             TokenType::Star | TokenType::Slash => Precedence::Factor,
                 TokenType::BangEqual | TokenType::EqualEqual => Precedence::Equality,

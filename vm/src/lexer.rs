@@ -63,6 +63,7 @@ impl<'a> Lexer<'a> {
                 ']' => Ok(self.make_token(TokenType::RightBracket)),
                 ',' => Ok(self.make_token(TokenType::Comma)),
                 '.' => Ok(self.make_token(TokenType::Dot)),
+                '+' => Ok(self.make_token(TokenType::Plus)),
                 '-' => Ok(self.make_token(TokenType::Minus)),
                 ';' => Ok(self.make_token(TokenType::Semicolon)),
                 '/' => Ok(self.make_token(TokenType::Slash)),
@@ -140,23 +141,6 @@ impl<'a> Lexer<'a> {
                         )
                     }
                 },
-                '+' => {
-                    if let Some(c) = self.source_iterator.peek() {
-                        if *c == '+' {
-                            self.advance();
-                            Ok(self.make_token(TokenType::PlusPlus))
-                        } else {
-                            Ok(self.make_token(TokenType::Plus))
-                        }
-                    } else {
-                        Err(
-                            LexerError::InternalError {
-                                msg: "Could not peek source_iterator".to_owned(),
-                                line: self.line
-                            }
-                        )
-                    }
-                }
 
                 // Literals
                 '"' => {

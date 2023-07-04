@@ -7,8 +7,6 @@ pub enum OpCode {
 
     Add, Subtract, Multiply, Divide, Mod,
 
-    Concat, 
-
     Equal, NotEqual,
     Greater, GreaterEqual,
     Less, LessEqual,
