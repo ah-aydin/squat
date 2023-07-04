@@ -21,4 +21,7 @@ func main() {
     for (string i = "a"; i != "aaaa"; i = i + "a") {
         println(i);
     }
+
+    int g;
+    println(g, type(g));
 }

@@ -305,8 +305,27 @@ impl<'a> Compiler<'a> {
         } else {
             var_type = SquatType::Nil;
             if squat_type.is_none() {
-                self.compile_error(&format!("Cannot create variable using 'var' without giving it a value"));
+                self.compile_error(&format!("Cannot define variable using 'var' without giving it a value"));
             }
+            let index = match squat_type.unwrap() {
+                SquatType::Int => {
+                    self.constants.write(SquatValue::Int(0))
+                },
+                SquatType::Float => {
+                    self.constants.write(SquatValue::Float(0.))
+                },
+                SquatType::String => {
+                    self.constants.write(SquatValue::String("".to_owned()))
+                },
+                SquatType::Bool => {
+                    self.constants.write(SquatValue::Bool(false))
+                },
+                SquatType::Function => unreachable!(),
+                SquatType::NativeFunction => unreachable!(),
+                SquatType::Type => unreachable!(),
+                SquatType::Nil => unreachable!()
+            };
+            self.write_op_code(OpCode::Constant(index));
         }
 
         self.consume_current(TokenType::Semicolon, "Expect ';' after variable declaration.");
@@ -981,13 +1000,13 @@ impl<'a> Compiler<'a> {
 
     fn compile_error(&mut self, message: &str) {
         let line = self.previous_token.as_ref().unwrap().line;
-        println!("[COMPILE ERROR] (Line {}) {}", line, message);
+        println!("[ERROR] (Line {}) {}", line, message);
         self.had_error = true;
         self.panic_mode = true;
     }
 
     fn compile_error_token(&mut self, line: u32, message: &str) {
-        println!("[COMPILE ERROR] (Line {}) {}", line, message);
+        println!("[ERROR] (Line {}) {}", line, message);
         self.had_error = true;
         self.panic_mode = true;
     }
