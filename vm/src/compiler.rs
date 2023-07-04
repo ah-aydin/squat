@@ -609,7 +609,7 @@ impl<'a> Compiler<'a> {
     fn number(&mut self) {
         let value: f64 = self.previous_token.as_ref().unwrap().lexeme.parse().unwrap();
 
-        let index = self.constants.write(SquatValue::Number(value));
+        let index = self.constants.write(SquatValue::Float(value));
         self.write_op_code(OpCode::Constant(index));
     }
 

@@ -433,7 +433,7 @@ mod test {
 
     #[test]
     fn keywords() {
-        let code = String::from("and break class else extends false for func if nil or print return static super this true var while");
+        let code = String::from("and break class else extends false for func if nil or return static super this true var while");
         let mut lexer = Lexer::new(&code);
         assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::And, "and"));
         assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Break, "break"));

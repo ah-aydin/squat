@@ -36,7 +36,7 @@ fn run_file(opts: &Options) -> Result<(),()> {
     } else if let InterpretResult::InterpretOk(value) = result {
         let exit_code = match value {
             SquatValue::Nil => 0.,
-            SquatValue::Number(value) => value,
+            SquatValue::Float(value) => value,
             _ => {
                 println!("[ERROR] Function 'main' can only return numbers");
                 return Ok(());

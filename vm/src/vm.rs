@@ -180,8 +180,8 @@ impl VM {
                         }
                     }
                     OpCode::Negate => {
-                        if let Some(SquatValue::Number(value)) = self.stack.pop() {
-                            self.stack.push(SquatValue::Number(-value));
+                        if let Some(SquatValue::Float(value)) = self.stack.pop() {
+                            self.stack.push(SquatValue::Float(-value));
                         } else {
                             self.runtime_error("Negate must be used on a numeric value");
                             return InterpretResult::InterpretRuntimeError;
@@ -342,7 +342,7 @@ impl VM {
 
                     OpCode::Start => {},
                     OpCode::Stop => {
-                        return InterpretResult::InterpretOk(SquatValue::Number(0.));
+                        return InterpretResult::InterpretOk(SquatValue::Float(0.));
                     }
                 }
             } else {
@@ -350,7 +350,7 @@ impl VM {
             }
         }
 
-        InterpretResult::InterpretOk(SquatValue::Number(0.))
+        InterpretResult::InterpretOk(SquatValue::Float(0.))
     }
 
     fn binary_op<F>(&mut self, op: F)
@@ -359,9 +359,9 @@ impl VM {
         let left = self.stack.pop();
 
         if left.is_some() && right.is_some() {
-            if let SquatValue::Number(right) = right.unwrap() {
-                if let SquatValue::Number(left) = left.unwrap() {
-                    self.stack.push(SquatValue::Number(op(left, right)));
+            if let SquatValue::Float(right) = right.unwrap() {
+                if let SquatValue::Float(left) = left.unwrap() {
+                    self.stack.push(SquatValue::Float(op(left, right)));
                 } else {
                     self.runtime_error("Left operand is not a numeric value");
                 }
