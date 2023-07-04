@@ -8,17 +8,21 @@ pub enum SquatType {
     String,
     Bool,
     Function,
+    NativeFunction,
+    Type
 }
 
 impl fmt::Display for SquatType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SquatType::Nil => write!(f, "<type Nil>"),
-            SquatType::Int => write!(f, "<type Int>"),
-            SquatType::Float => write!(f, "<type Float>"),
-            SquatType::String => write!(f, "<type String>"),
-            SquatType::Bool => write!(f, "<type Bool>"),
-            SquatType::Function => write!(f, "<type Function>"),
+            SquatType::Nil => write!(f, "Nil"),
+            SquatType::Int => write!(f, "Int"),
+            SquatType::Float => write!(f, "Float"),
+            SquatType::String => write!(f, "String"),
+            SquatType::Bool => write!(f, "Bool"),
+            SquatType::Function => write!(f, "Function"),
+            SquatType::NativeFunction=> write!(f, "NativeFunction"),
+            SquatType::Type => write!(f, "Type"),
         }
     }
 }

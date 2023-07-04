@@ -1,8 +1,8 @@
-use crate::native::{
+use crate::{native::{
     NativeFunc,
     NativeFuncArgs,
     NativeFuncReturnType
-};
+}, value::squat_type::SquatType};
 
 #[derive(Debug, Clone)]
 pub struct SquatFunction {
@@ -42,6 +42,15 @@ impl SquatNativeFunction {
 pub enum SquatObject {
     Function(SquatFunction),
     NativeFunction(SquatNativeFunction)
+}
+
+impl SquatObject {
+    pub fn get_type(&self) -> SquatType {
+        match self {
+            SquatObject::Function(_) => SquatType::Function,
+            SquatObject::NativeFunction(_) => SquatType::NativeFunction,
+        }
+    }
 }
 
 impl ToString for SquatObject {

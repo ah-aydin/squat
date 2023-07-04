@@ -21,6 +21,18 @@ impl SquatValue {
             _ => true
         }
     }
+
+    pub fn get_type(&self) -> SquatType {
+        match self {
+            SquatValue::Nil => SquatType::Nil,
+            SquatValue::Int(_) => SquatType::Int,
+            SquatValue::Float(_) => SquatType::Float,
+            SquatValue::String(_) => SquatType::String,
+            SquatValue::Bool(_) => SquatType::Bool,
+            SquatValue::Object(obj) => obj.get_type(),
+            SquatValue::Type(_) => SquatType::Type,
+        }
+    }
 }
 
 impl std::ops::Add<SquatValue> for SquatValue {

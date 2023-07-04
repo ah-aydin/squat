@@ -414,6 +414,7 @@ impl VM {
         self.define_native_func("number", Some(1), native::number::number);
 
         self.define_native_func("time", Some(0), native::misc::time);
+        self.define_native_func("type", Some(1), native::misc::get_type);
     }
 
     fn define_native_func(&mut self, name: &str, arity: Option<usize>, func: native::NativeFunc) {
