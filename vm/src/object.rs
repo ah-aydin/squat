@@ -47,7 +47,7 @@ pub enum SquatObject {
 impl SquatObject {
     pub fn get_type(&self) -> SquatType {
         match self {
-            SquatObject::Function(_) => SquatType::Function,
+            SquatObject::Function(_) => SquatType::Function(Default::default()),
             SquatObject::NativeFunction(_) => SquatType::NativeFunction,
         }
     }

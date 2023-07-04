@@ -7,7 +7,7 @@ use crate::lexer::{Lexer, LexerError};
 use crate::object::{SquatObject, SquatFunction};
 use crate::op_code::OpCode;
 use crate::token::{TokenType, Token};
-use crate::value::squat_type::SquatType;
+use crate::value::squat_type::{SquatType, SquatFunctionTypeData};
 use crate::value::{
     squat_value::SquatValue,
     ValueArray
@@ -72,6 +72,7 @@ pub struct Compiler<'a> {
     scope_type: ScopeType,
     scope_stack_index: usize,
 
+    last_func_name: String,
     had_error: bool,
     panic_mode: bool,
 
@@ -102,6 +103,7 @@ impl<'a> Compiler<'a> {
             scope_type: ScopeType::Global,
             scope_stack_index: 0,
 
+            last_func_name: String::from(""),
             had_error: false,
             panic_mode: false,
 
@@ -240,32 +242,40 @@ impl<'a> Compiler<'a> {
             self.scope_stack_index = self.locals.len();
             self.scope_type = ScopeType::Function;
 
-            self.patch_function(&func_name);
+            self.initialize_function(&func_name);
             self.begin_scope();
 
             let jump = self.emit_jump(OpCode::Jump(usize::MAX));
-            let mut arity = 0;
+            let mut param_types: Vec<SquatType> = Vec::with_capacity(255);
             if !self.check_current(TokenType::RightParenthesis) {
-                arity += 1;
+                param_types.push(match self.get_variable_type() {
+                    Ok(value) => value,
+                    Err(()) => return,
+                });
                 let (constant, var_name) = match self.parse_variable("Expect parameter name") {
                     Ok((constant, var_name)) => (constant, var_name),
                     Err(_) => return,
                 };
-                self.define_variable(constant, &var_name, SquatType::Nil);
+                self.define_variable(constant, &var_name, param_types.last().unwrap().clone());
 
                 while self.check_current(TokenType::Comma) {
-                    arity += 1;
-                    if arity > 255 {
-                        self.compile_error("Can't have more then 255 parameters on a function");
-                    }
+                    param_types.push(match self.get_variable_type() {
+                        Ok(value) => value,
+                        Err(()) => return,
+                    });
                     let (constant, var_name) = match self.parse_variable("Expect parameter name") {
                         Ok((constant, var_name)) => (constant, var_name),
                         Err(_) => return,
                     };
-                    self.define_variable(constant, &var_name, SquatType::Nil);
+                    self.define_variable(constant, &var_name, param_types.last().unwrap().clone());
                 }
                 self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
             }
+
+            let return_type = match self.check_variable_type() {
+                Some(value) => value,
+                None => SquatType::Nil,
+            };
 
             self.consume_current(TokenType::LeftBrace, "Expected '{' to define function body");
 
@@ -276,7 +286,17 @@ impl<'a> Compiler<'a> {
             self.end_scope();
             self.write_op_code(OpCode::Nil);
             self.write_op_code(OpCode::Return);
+
             self.patch_jump(jump);
+            let arity = param_types.len();
+            self.patch_function(
+                &func_name,
+                SquatFunctionTypeData::new(
+                    arity,
+                    param_types,
+                    return_type
+                )
+            );
 
             let function_obj = SquatObject::Function(
                 SquatFunction::new(&func_name, starting_index, arity)
@@ -303,27 +323,28 @@ impl<'a> Compiler<'a> {
         if self.check_current(TokenType::Equal) {
             var_type = self.expression_with_type(squat_type);
         } else {
-            var_type = SquatType::Nil;
             if squat_type.is_none() {
                 self.compile_error(&format!("Cannot define variable using 'var' without giving it a value"));
+                return;
             }
             let index = match squat_type.unwrap() {
                 SquatType::Int => {
+                    var_type = SquatType::Int;
                     self.constants.write(SquatValue::Int(0))
                 },
                 SquatType::Float => {
+                    var_type = SquatType::Float;
                     self.constants.write(SquatValue::Float(0.))
                 },
                 SquatType::String => {
+                    var_type = SquatType::String;
                     self.constants.write(SquatValue::String("".to_owned()))
                 },
                 SquatType::Bool => {
+                    var_type = SquatType::Bool;
                     self.constants.write(SquatValue::Bool(false))
                 },
-                SquatType::Function => unreachable!(),
-                SquatType::NativeFunction => unreachable!(),
-                SquatType::Type => unreachable!(),
-                SquatType::Nil => unreachable!()
+                _ => unreachable!("var_declaration")
             };
             self.write_op_code(OpCode::Constant(index));
         }
@@ -331,6 +352,39 @@ impl<'a> Compiler<'a> {
         self.consume_current(TokenType::Semicolon, "Expect ';' after variable declaration.");
 
         self.define_variable(index, &name, var_type);
+    }
+
+    fn get_variable_type(&mut self) -> Result<SquatType, ()> {
+        if self.check_current(TokenType::BoolType)
+            || self.check_current(TokenType::IntType)
+            || self.check_current(TokenType::FloatType)
+            || self.check_current(TokenType::StringType) {
+            return match self.previous_token.as_ref().unwrap().token_type {
+                TokenType::BoolType=> Ok(SquatType::Bool),
+                TokenType::IntType => Ok(SquatType::Int),
+                TokenType::FloatType => Ok(SquatType::Float),
+                TokenType::StringType => Ok(SquatType::String),
+                _ => unreachable!()
+            };
+        }
+        self.compile_error("Expected variable type for function parameter");
+        Err(())
+    }
+
+    fn check_variable_type(&mut self) -> Option<SquatType> {
+        if self.check_current(TokenType::BoolType)
+            || self.check_current(TokenType::IntType)
+            || self.check_current(TokenType::FloatType)
+            || self.check_current(TokenType::StringType) {
+            return match self.previous_token.as_ref().unwrap().token_type {
+                TokenType::BoolType=> Some(SquatType::Bool),
+                TokenType::IntType => Some(SquatType::Int),
+                TokenType::FloatType => Some(SquatType::Float),
+                TokenType::StringType => Some(SquatType::String),
+                _ => unreachable!()
+            };
+        }
+        None
     }
 
     /// Return value:
@@ -366,7 +420,6 @@ impl<'a> Compiler<'a> {
                             &self.scope_depth
                         )
                     );
-                    //return Ok((0, name));
                     return Err(());
                 }
             }
@@ -388,12 +441,20 @@ impl<'a> Compiler<'a> {
         Ok((index, name))
     }
 
-    fn patch_function(&mut self, name: &str) {
+    fn initialize_function(&mut self, name: &str) {
         if self.scope_depth > 0 {
             self.locals.last_mut().unwrap().depth = Some(self.scope_depth);
             return;
         }
         self.globals.get_mut(name).unwrap().initialized = true;
+    }
+
+    fn patch_function(&mut self, name: &str, data: SquatFunctionTypeData) {
+        if self.scope_depth > 0 {
+            self.locals.last_mut().unwrap().set_type(SquatType::Function(data));
+            return;
+        }
+        self.globals.get_mut(name).unwrap().set_type(SquatType::Function(data));
     }
 
     fn define_function(&mut self, index: usize) {
@@ -623,22 +684,61 @@ impl<'a> Compiler<'a> {
     }
 
     fn call(&mut self) -> SquatType {
-        let mut arg_count = 0;
-        if !self.check_current(TokenType::RightParenthesis) {
-            arg_count += 1;
-            self.expression();
-
-            while self.check_current(TokenType::Comma) {
+        if let Some((_, SquatType::Function(data), _)) = self.resolve_global(&self.last_func_name.clone()) {
+            let mut arg_count = 0;
+            if !self.check_current(TokenType::RightParenthesis) {
+                let expression_type = self.expression();
+                self.check_types(Some(data.get_param_type(arg_count)), &expression_type);
                 arg_count += 1;
-                self.expression();
+
+                while self.check_current(TokenType::Comma) {
+                    let expression_type = self.expression();
+                    self.check_types(Some(data.get_param_type(arg_count)), &expression_type);
+                    arg_count += 1;
+                }
+                self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
             }
-            self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
+
+            self.write_op_code(OpCode::Call(arg_count));
+            return data.get_return_type();
+        } else if let Some((_, SquatType::Function(data), _)) = self.resolve_local(&self.last_func_name.clone()) {
+            // Repeated code cuz borrow checker does not want a local closure owning self :(
+            let mut arg_count = 0;
+            if !self.check_current(TokenType::RightParenthesis) {
+                let expression_type = self.expression();
+                self.check_types(Some(data.get_param_type(arg_count)), &expression_type);
+                arg_count += 1;
+
+                while self.check_current(TokenType::Comma) {
+                    let expression_type = self.expression();
+                    self.check_types(Some(data.get_param_type(arg_count)), &expression_type);
+                    arg_count += 1;
+                }
+                self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
+            }
+
+            self.write_op_code(OpCode::Call(arg_count));
+            return data.get_return_type();
         }
+        if let Some((_, SquatType::NativeFunction, _)) = self.resolve_native(&self.last_func_name.clone()) {
+            // TODO this is temporary code for the native calls
+            let mut arg_count = 0;
+            if !self.check_current(TokenType::RightParenthesis) {
+                self.expression();
+                arg_count += 1;
 
-        self.write_op_code(OpCode::Call(arg_count));
+                while self.check_current(TokenType::Comma) {
+                    self.expression();
+                    arg_count += 1;
+                }
+                self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
+            }
 
-        // TODO, this is temporary
-        SquatType::Nil
+            self.write_op_code(OpCode::Call(arg_count));
+            return SquatType::Nil;
+        }
+        self.compile_error("WTF IS GOING ON HERE");
+        unreachable!("call")
     }
 
     fn expression_with_type(&mut self, expected_type: Option<SquatType>) -> SquatType {
@@ -721,36 +821,67 @@ impl<'a> Compiler<'a> {
 
     }
 
-    fn variable(&mut self, expected_type: Option<SquatType>) -> SquatType {
+    fn variable(&mut self) -> SquatType {
         let var_name = self.previous_token.as_ref().unwrap().lexeme.clone();
 
         let set_op_code: OpCode;
         let get_op_code: OpCode;
         let variable_type: SquatType;
+        let is_func: bool;
 
-        if let Some((index, t)) = self.resolve_local(&var_name) {
+        if let Some((index, t, b)) = self.resolve_local(&var_name) {
             set_op_code = OpCode::SetLocal(index - self.scope_stack_index);
             get_op_code = OpCode::GetLocal(index - self.scope_stack_index);
-            variable_type = t;
-        } else if let Some((index, t)) = self.resolve_global(&var_name) {
+            is_func = b;
+            if is_func {
+                variable_type = match t {
+                    SquatType::Function(data) => data.get_return_type(),
+                    _ => unreachable!()
+                };
+            } else {
+                variable_type = t;
+            }
+        } else if let Some((index, t, b)) = self.resolve_global(&var_name) {
             set_op_code = OpCode::SetGlobal(index);
             get_op_code = OpCode::GetGlobal(index);
-            variable_type = t;
-        } else if let Some((index, t)) = self.resolve_native(&var_name) {
+            is_func = b;
+            if is_func {
+                variable_type = match t {
+                    SquatType::Function(data) => data.get_return_type(),
+                    _ => unreachable!()
+                };
+            } else {
+                variable_type = t;
+            }
+        } else if let Some((index, t, b)) = self.resolve_native(&var_name) {
             set_op_code = OpCode::Nil; // Just to keep the compiler happy
             get_op_code = OpCode::GetNative(index);
-            variable_type = t;
+            is_func = b;
+            if is_func {
+                variable_type = match t {
+                    // TODO temporary code
+                    SquatType::NativeFunction => SquatType::Nil,
+                    _ => unreachable!()
+                };
+            } else {
+                variable_type = t;
+            }
         }
         else {
             self.compile_error(&format!("{} is not defined.", var_name));
             return SquatType::Nil;
         }
 
-        if !self.check_types(expected_type, &variable_type) {
-            return SquatType::Nil;
-        }
-
         if self.check_current(TokenType::Equal) {
+            if is_func {
+                self.compile_error(
+                    &format!(
+                        "Cannot change assignment of function '{}",
+                        var_name
+                    )
+                );
+                return  SquatType::Nil;
+            }
             if let OpCode::GetNative(_) = get_op_code {
                 self.compile_error(
                     &format!(
@@ -765,6 +896,11 @@ impl<'a> Compiler<'a> {
         } else {
             self.write_op_code(get_op_code);
         }
+
+        if is_func {
+            self.last_func_name = var_name;
+        }
+
         variable_type
     }
 
@@ -887,29 +1023,43 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    fn resolve_native(&mut self, name: &str) -> Option<(usize, SquatType)> {
+    fn resolve_native(&mut self, name: &str) -> Option<(usize, SquatType, bool)> {
         if let Some(native) = self.natives.iter().position(|x| match x {
             SquatValue::Object(SquatObject::NativeFunction(func)) => func.name == name,
             _ => unreachable!()
         }) {
-            return Some((native, SquatType::NativeFunction));
+            return Some((native, SquatType::NativeFunction, true));
         }
         None
     }
 
-    fn resolve_global(&mut self, name: &str) -> Option<(usize, SquatType)> {
+    fn resolve_global(&mut self, name: &str) -> Option<(usize, SquatType, bool)> {
         if let Some(global) = self.globals.get(name) {
             if global.initialized {
-                return Some((global.index, global.get_type()));
+                let variable_type: SquatType = global.get_type();
+                let is_func: bool;
+                if let SquatType::Function(_data) = global.get_type() {
+                    is_func = true;
+                } else {
+                    is_func = false;
+                }
+                return Some((global.index, variable_type, is_func));
             }
         }
         None
     }
 
-    fn resolve_local(&mut self, name: &str) -> Option<(usize, SquatType)> {
+    fn resolve_local(&mut self, name: &str) -> Option<(usize, SquatType, bool)> {
         for i in (0..self.locals.len()).rev() {
             if self.locals[i].name == name && self.locals[i].depth.is_some() {
-                return Some((i, self.locals[i].get_type()));
+                let variable_type: SquatType = self.locals[i].get_type();
+                let is_func: bool;
+                if let SquatType::Function(_data) = self.locals[i].get_type() {
+                    is_func = true;
+                } else {
+                    is_func = false;
+                }
+                return Some((i, variable_type, is_func));
             }
         }
         None
@@ -926,7 +1076,7 @@ impl<'a> Compiler<'a> {
             TokenType::Number                                   => self.number(),
             TokenType::False | TokenType::Nil | TokenType::True => self.literal(),
             TokenType::String                                   => self.string(),
-            TokenType::Identifier                               => self.variable(expected_type),
+            TokenType::Identifier                               => self.variable(),
             TokenType::Eof                                      => SquatType::Nil,
             _ => { 
                 self.compile_error("This token is not siutable for an expression start");
@@ -1012,6 +1162,6 @@ impl<'a> Compiler<'a> {
 
     fn compile_warning(&mut self, message: &str) {
         let line = self.previous_token.as_ref().unwrap().line;
-        println!("[COMPILE WARNING] (Line {}) {}", line, message);
+        println!("[WARNING] (Line {}) {}", line, message);
     }
 }
