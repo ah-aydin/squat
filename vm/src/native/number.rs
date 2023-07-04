@@ -1,5 +1,5 @@
 use super::*;
-use crate::value::SquatValue;
+use crate::value::squat_value::SquatValue;
 
 pub fn cbrt(args: NativeFuncArgs) -> NativeFuncReturnType {
     match &args[0] {

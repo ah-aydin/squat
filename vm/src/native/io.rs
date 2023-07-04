@@ -1,5 +1,5 @@
 use super::*;
-use crate::value::SquatValue;
+use crate::value::squat_value::SquatValue;
 
 pub fn print(args: NativeFuncArgs) -> NativeFuncReturnType {
     let output = args.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(" ");

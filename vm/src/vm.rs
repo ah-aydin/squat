@@ -6,7 +6,7 @@ use crate::{
         CompileStatus
     },
     value::{
-        SquatValue,
+        squat_value::SquatValue,
         ValueArray
     },
     native,

@@ -13,7 +13,7 @@ use std::fs;
 use options::Options;
 use vm::{VM, InterpretResult};
 
-use crate::value::SquatValue;
+use crate::value::squat_value::SquatValue;
 
 
 fn run_file(opts: &Options) -> Result<(),()> {

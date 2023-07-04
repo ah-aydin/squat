@@ -1,4 +1,4 @@
-use crate::value::SquatValue;
+use crate::value::squat_value::SquatValue;
 
 pub mod io;
 pub mod number;

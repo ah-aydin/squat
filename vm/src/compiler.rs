@@ -5,7 +5,7 @@ use crate::lexer::{Lexer, LexerError};
 use crate::object::{SquatObject, SquatFunction};
 use crate::op_code::OpCode;
 use crate::token::{TokenType, Token};
-use crate::value::{SquatValue, ValueArray};
+use crate::value::{squat_value:: SquatValue, ValueArray};
 
 const INITIAL_LOCALS_VECTOR_SIZE: usize = 256;
 
@@ -50,14 +50,14 @@ enum ScopeType {
 }
 
 #[derive(Debug)]
-struct Local {
+struct CompilerLocal {
     name: String,
     // If this value is missing, the variable is not initialized yet.
     depth: Option<u32>
 }
 
 #[derive(Debug)]
-struct Global {
+struct CompilerGlobal {
     index: usize,
     initialized: bool
 }
@@ -69,11 +69,11 @@ pub struct Compiler<'a> {
 
     main_chunk: &'a mut Chunk,
 
-    globals: HashMap<String, Global>,
+    globals: HashMap<String, CompilerGlobal>,
     natives: &'a Vec<SquatValue>,
     constants: &'a mut ValueArray,
 
-    locals: Vec<Local>,
+    locals: Vec<CompilerLocal>,
     scope_depth: u32,
     scope_type: ScopeType,
     scope_stack_index: usize,
@@ -334,7 +334,7 @@ impl<'a> Compiler<'a> {
                     return Err(());
                 }
             }
-            let local = Local { name: name.clone(), depth: None };
+            let local = CompilerLocal { name: name.clone(), depth: None };
             let index = self.locals.len();
             self.locals.push(local);
             return Ok((index, name));
@@ -347,7 +347,7 @@ impl<'a> Compiler<'a> {
         }
 
         let index = self.globals.len();
-        let global = Global { index, initialized: false };
+        let global = CompilerGlobal { index, initialized: false };
         self.globals.insert(var_name, global);
         Ok((index, name))
     }
