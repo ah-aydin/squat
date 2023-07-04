@@ -270,6 +270,12 @@ impl<'a> Lexer<'a> {
                 "true" =>       Some(self.make_token(TokenType::True)),
                 "var" =>        Some(self.make_token(TokenType::Var)),
                 "while" =>      Some(self.make_token(TokenType::While)),
+                
+                "bool" =>       Some(self.make_token(TokenType::BoolType)),
+                "float" =>      Some(self.make_token(TokenType::FloatType)),
+                "int" =>        Some(self.make_token(TokenType::IntType)),
+                "string" =>     Some(self.make_token(TokenType::StringType)),
+
                 _ =>            Some(self.make_token(TokenType::Identifier))
             }
         }

@@ -139,14 +139,33 @@ impl<'a> Compiler<'a> {
     //////////////////////////////////////////////////////////////////////////
     /// Statement rules
     //////////////////////////////////////////////////////////////////////////
+
+    fn try_var_declaration(&mut self) -> bool {
+        if self.check_current(TokenType::Var) {
+            self.var_declaration(None);
+            return true;
+        } else if self.check_current(TokenType::BoolType) {
+            self.var_declaration(Some(SquatType::Bool));
+            return true;
+        } else if self.check_current(TokenType::IntType) {
+            self.var_declaration(Some(SquatType::Int));
+            return true;
+        } else if self.check_current(TokenType::FloatType) {
+            self.var_declaration(Some(SquatType::Float));
+            return true;
+        } else if self.check_current(TokenType::StringType) {
+            self.var_declaration(Some(SquatType::String));
+            return true;
+        }
+        false
+    }
     
     fn declaration_global(&mut self) {
         if self.check_current(TokenType::Semicolon) {
             self.compile_warning("Unnecessary ';'");
         } else if self.check_current(TokenType::Func) {
             self.function_declaration();
-        } else if self.check_current(TokenType::Var) {
-            self.var_declaration();
+        } else if self.try_var_declaration() {
         } else if self.check_current(TokenType::Return) {
             self.compile_error("Cannot return from outside a function.");
         } else {
@@ -163,8 +182,7 @@ impl<'a> Compiler<'a> {
             self.compile_warning("Unnecessary ';'");
         } else if self.check_current(TokenType::Func) {
             self.function_declaration();
-        } else if self.check_current(TokenType::Var) {
-            self.var_declaration();
+        } else if self.try_var_declaration() {
         } else if self.check_current(TokenType::Return) {
             self.return_statement();
         } else {
@@ -233,7 +251,7 @@ impl<'a> Compiler<'a> {
                     Ok((constant, var_name)) => (constant, var_name),
                     Err(_) => return,
                 };
-                self.define_variable(constant, &var_name);
+                self.define_variable(constant, &var_name, SquatType::Nil);
 
                 while self.check_current(TokenType::Comma) {
                     arity += 1;
@@ -244,7 +262,7 @@ impl<'a> Compiler<'a> {
                         Ok((constant, var_name)) => (constant, var_name),
                         Err(_) => return,
                     };
-                    self.define_variable(constant, &var_name);
+                    self.define_variable(constant, &var_name, SquatType::Nil);
                 }
                 self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
             }
@@ -272,7 +290,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    fn var_declaration(&mut self) {
+    fn var_declaration(&mut self, squat_type: Option<SquatType>) {
         let (index, name) = match self.parse_variable("Expect variable name") {
             Ok(value) => value,
             Err(()) => {
@@ -280,15 +298,20 @@ impl<'a> Compiler<'a> {
             }
         };
 
+        let var_type: SquatType;
+
         if self.check_current(TokenType::Equal) {
-            self.expression();
+            var_type = self.expression_with_type(squat_type);
         } else {
-            self.compile_error(&format!("Cannot create variable using 'var' without giving it a value"));
+            var_type = SquatType::Nil;
+            if squat_type.is_none() {
+                self.compile_error(&format!("Cannot create variable using 'var' without giving it a value"));
+            }
         }
 
         self.consume_current(TokenType::Semicolon, "Expect ';' after variable declaration.");
 
-        self.define_variable(index, &name);
+        self.define_variable(index, &name, var_type);
     }
 
     /// Return value:
@@ -361,12 +384,14 @@ impl<'a> Compiler<'a> {
         self.write_op_code(OpCode::DefineGlobal(index));
     }
 
-    fn define_variable(&mut self, index: usize, name: &str) {
+    fn define_variable(&mut self, index: usize, name: &str, squat_type: SquatType) {
         if self.scope_depth > 0 {
             self.locals.last_mut().unwrap().depth = Some(self.scope_depth);
+            self.locals.last_mut().unwrap().set_type(squat_type);
             return;
         }
         self.globals.get_mut(name).unwrap().initialized = true;
+        self.globals.get_mut(name).unwrap().set_type(squat_type);
         self.write_op_code(OpCode::DefineGlobal(index));
     }
 
@@ -399,7 +424,7 @@ impl<'a> Compiler<'a> {
 
     fn if_statement(&mut self) {
         self.consume_current(TokenType::LeftParenthesis, "Expected '(' after 'if'");
-        self.expression();
+        self.expression(); // This expression can have any type, no type check required
         self.consume_current(TokenType::RightParenthesis, "Expected closing ')'");
 
         let then_jump = self.emit_jump(OpCode::JumpIfFalse(usize::MAX));
@@ -420,7 +445,7 @@ impl<'a> Compiler<'a> {
     fn while_statement(&mut self) {
         let loop_start = self.main_chunk.get_size();
         self.consume_current(TokenType::LeftParenthesis, "Expected '(' after 'while'");
-        self.expression();
+        self.expression(); // This expression can have any type, no type check required
         self.consume_current(TokenType::RightParenthesis, "Expected closing ')'");
 
         let exit_jump = self.emit_jump(OpCode::JumpIfFalse(usize::MAX));
@@ -436,8 +461,7 @@ impl<'a> Compiler<'a> {
         self.begin_scope();
 
         self.consume_current(TokenType::LeftParenthesis, "Expected '(' after 'for'");
-        if self.check_current(TokenType::Var) {
-            self.var_declaration();
+        if self.try_var_declaration() {
         } else if !self.check_current(TokenType::Semicolon) {
             self.expression_statement();
         }
@@ -445,7 +469,7 @@ impl<'a> Compiler<'a> {
         let mut loop_start = self.main_chunk.get_size();
         let mut exit_jump: Option<usize> = None;
         if !self.check_current(TokenType::Semicolon) {
-            self.expression();
+            self.expression(); // This expression can have any type, no type check required
             self.consume_current(TokenType::Semicolon, "Expected ';' after loop condition");
 
             exit_jump = Some(self.emit_jump(OpCode::JumpIfFalse(usize::MAX)));
@@ -500,11 +524,8 @@ impl<'a> Compiler<'a> {
             self.previous_token.as_ref().unwrap().token_type,
             expected_type.clone()
         );
-        if let Some(expected_type) = expected_type {
-            if prefix_type != expected_type {
-                self.compile_error(&format!("Expected {} but found {}", expected_type, prefix_type));
-                return SquatType::Nil;
-            }
+        if !self.check_types(expected_type, &prefix_type) {
+            return SquatType::Nil;
         }
 
         while precedence <= self.get_precedence(
@@ -559,7 +580,8 @@ impl<'a> Compiler<'a> {
         let token_type = self.previous_token.as_ref().unwrap().clone().token_type;
 
         let precedence = self.get_precedence(token_type);
-        let rhs_type = self.parse_precedence(precedence + 1, expected_type);
+        let rhs_type = self.parse_precedence(precedence + 1, expected_type.clone());
+        self.check_types(expected_type, &rhs_type);
 
         match token_type {
             TokenType::Plus             => self.write_op_code(OpCode::Add),
@@ -615,7 +637,7 @@ impl<'a> Compiler<'a> {
         t
     }
 
-    fn literal(&mut self, expected_type: Option<SquatType>) -> SquatType {
+    fn literal(&mut self) -> SquatType {
         let token_type = self.previous_token.as_ref().unwrap().token_type;
 
         match token_type {
@@ -636,12 +658,21 @@ impl<'a> Compiler<'a> {
     }
 
     fn number(&mut self) -> SquatType {
-        let value: f64 = self.previous_token.as_ref().unwrap().lexeme.parse().unwrap();
+        let lexeme = &self.previous_token.as_ref().unwrap().lexeme;
+        let index;
+        let number_type: SquatType;
+        if lexeme.contains(".") {
+            let value: f64 = lexeme.parse().unwrap();
+            index = self.constants.write(SquatValue::Float(value));
+            number_type = SquatType::Float;
+        } else {
+            let value: i64 = lexeme.parse().unwrap();
+            index = self.constants.write(SquatValue::Int(value));
+            number_type = SquatType::Int;
+        }
 
-        let index = self.constants.write(SquatValue::Float(value));
         self.write_op_code(OpCode::Constant(index));
-
-        SquatType::Float
+        number_type
     }
 
     fn string(&mut self) -> SquatType {
@@ -655,15 +686,21 @@ impl<'a> Compiler<'a> {
     fn unary(&mut self, expected_type: Option<SquatType>) -> SquatType {
         let token_type = self.previous_token.as_ref().unwrap().token_type;
 
-        let t = self.parse_precedence(Precedence::Unary, expected_type);
+        let expression_type = self.parse_precedence(Precedence::Unary, expected_type.clone());
+        self.check_types(expected_type, &expression_type);
 
         match token_type {
-            TokenType::Bang => self.write_op_code(OpCode::Not),
-            TokenType::Minus => self.write_op_code(OpCode::Negate),
+            TokenType::Bang => {
+                self.write_op_code(OpCode::Not);
+                SquatType::Bool
+            },
+            TokenType::Minus => {
+                self.write_op_code(OpCode::Negate);
+                expression_type
+            }
             _ => unreachable!()
-        };
+        }
 
-        t
     }
 
     fn variable(&mut self, expected_type: Option<SquatType>) -> SquatType {
@@ -691,11 +728,8 @@ impl<'a> Compiler<'a> {
             return SquatType::Nil;
         }
 
-        if let Some(expected_type) = expected_type {
-            if variable_type != expected_type {
-                self.compile_error(&format!("Expected {} but found {}", expected_type, variable_type));
-                return SquatType::Nil;
-            }
+        if !self.check_types(expected_type, &variable_type) {
+            return SquatType::Nil;
         }
 
         if self.check_current(TokenType::Equal) {
@@ -783,23 +817,36 @@ impl<'a> Compiler<'a> {
     }
 
     fn synchronize(&mut self) {
-        // TODO this function needs more word to function properly
+        // TODO this function needs more work to function properly
         self.panic_mode = false;
         while self.current_token.as_ref().unwrap().token_type != TokenType::Eof {
             match self.current_token.as_ref().unwrap().token_type {
                 TokenType::Class | TokenType::Func | TokenType::Var | TokenType::For |
-                    TokenType::If | TokenType::While |
-                    TokenType::Return => {
+                    TokenType::If | TokenType::While | TokenType::BoolType |
+                    TokenType::IntType | TokenType::FloatType | TokenType::StringType |
+                    TokenType::Return | TokenType::Semicolon => {
                         break;
                     },
-               TokenType::Semicolon=> {
-                   self.advance();
-                   break;
-               }
                 _ => {}
             }
             self.advance();
         }
+    }
+
+    fn check_types(&mut self, expected_type: Option<SquatType>, type_to_check: &SquatType) -> bool {
+        if let Some(expected_type) = expected_type {
+            if *type_to_check != expected_type {
+                self.compile_error(
+                    &format!(
+                        "Expected {} but found {}",
+                        expected_type,
+                        type_to_check
+                    )
+                );
+                return false;
+            }
+        }
+        true
     }
 
     //////////////////////////////////////////////////////////////////////////
@@ -859,7 +906,7 @@ impl<'a> Compiler<'a> {
             TokenType::LeftParenthesis                          => self.grouping(expected_type),
             TokenType::Bang | TokenType::Minus                  => self.unary(expected_type),
             TokenType::Number                                   => self.number(),
-            TokenType::False | TokenType::Nil | TokenType::True => self.literal(expected_type),
+            TokenType::False | TokenType::Nil | TokenType::True => self.literal(),
             TokenType::String                                   => self.string(),
             TokenType::Identifier                               => self.variable(expected_type),
             TokenType::Eof                                      => SquatType::Nil,

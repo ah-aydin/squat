@@ -19,6 +19,9 @@ pub enum TokenType {
     And, Break, Class, Else, Extends, False, For, Func, If, Nil, Or,
     Return, Static, Super, This, True, Var, While,
 
+    // Type Keywords
+    BoolType, FloatType, IntType, StringType,
+
     Eof
 }
 

@@ -22,7 +22,7 @@ const INITIAL_CALL_STACK_SIZE: usize = 256;
 
 #[derive(PartialEq)]
 pub enum InterpretResult {
-    InterpretOk(SquatValue),
+    InterpretOk(i64),
     InterpretCompileError,
     InterpretRuntimeError
 }
@@ -148,7 +148,8 @@ impl VM {
                     OpCode::Subtract        => self.binary_op(|left, right| left - right),
                     OpCode::Multiply        => self.binary_op(|left, right| left * right),
                     OpCode::Divide          => self.binary_op(|left, right| left / right),
-                    OpCode::Mod             => self.binary_op(|left, right| left % right),
+                    // Just to compile for now
+                    OpCode::Mod             => self.binary_op(|left, right| left - right),
                     OpCode::Equal           => self.binary_cmp(|left, right| left == right),
                     OpCode::NotEqual        => self.binary_cmp(|left, right| left != right),
                     OpCode::Greater         => self.binary_cmp(|left, right| left > right),
@@ -180,11 +181,14 @@ impl VM {
                         }
                     }
                     OpCode::Negate => {
-                        if let Some(SquatValue::Float(value)) = self.stack.pop() {
-                            self.stack.push(SquatValue::Float(-value));
-                        } else {
-                            self.runtime_error("Negate must be used on a numeric value");
-                            return InterpretResult::InterpretRuntimeError;
+                        match self.stack.pop() {
+                            Some(SquatValue::Float(value)) => {
+                                self.stack.push(SquatValue::Float(-value));
+                            },
+                            Some(SquatValue::Int(value)) => {
+                                self.stack.push(SquatValue::Int(-value));
+                            },
+                            _ => unreachable!("Negate requires a number value")
                         }
                     },
 
@@ -336,13 +340,16 @@ impl VM {
                             self.chunks[self.current_chunk].current_instruction = call_frame.return_address;
                             self.stack.push(return_val);
                         } else {
-                            return InterpretResult::InterpretOk(return_val);
+                            if let SquatValue::Int(i) = return_val {
+                                return InterpretResult::InterpretOk(i);
+                            }
+                            return InterpretResult::InterpretOk(0);
                         }
                     },
 
                     OpCode::Start => {},
                     OpCode::Stop => {
-                        return InterpretResult::InterpretOk(SquatValue::Float(0.));
+                        return InterpretResult::InterpretOk(0);
                     }
                 }
             } else {
@@ -350,27 +357,18 @@ impl VM {
             }
         }
 
-        InterpretResult::InterpretOk(SquatValue::Float(0.))
+        InterpretResult::InterpretOk(0)
     }
 
     fn binary_op<F>(&mut self, op: F)
-    where F: FnOnce(f64, f64) -> f64 {
+    where F: FnOnce(SquatValue, SquatValue) -> SquatValue {
         let right = self.stack.pop();
         let left = self.stack.pop();
 
         if left.is_some() && right.is_some() {
-            if let SquatValue::Float(right) = right.unwrap() {
-                if let SquatValue::Float(left) = left.unwrap() {
-                    self.stack.push(SquatValue::Float(op(left, right)));
-                } else {
-                    self.runtime_error("Left operand is not a numeric value");
-                }
-            }
-            else {
-                self.runtime_error("Right operand is not a numeric value");
-            }
+            self.stack.push(op(left.unwrap(), right.unwrap()));
         } else {
-            panic!("Binary operations require 2 values in the stack");
+            unreachable!("Binary operations require 2 values in the stack");
         }
     }
 
@@ -382,7 +380,7 @@ impl VM {
         if left.is_some() && right.is_some() {
             self.stack.push(SquatValue::Bool(op(left.unwrap(), right.unwrap())));
         } else {
-            panic!("Binary comparisons require 2 values in the stack");
+            unreachable!("Binary comparisons require 2 values in the stack");
         }
     }
 

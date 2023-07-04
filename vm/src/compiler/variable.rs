@@ -20,6 +20,10 @@ impl CompilerLocal {
     pub fn get_type(&self) -> SquatType {
         self.squat_type.as_ref().unwrap_or(&SquatType::Nil).clone()
     }
+
+    pub fn set_type(&mut self, squat_type: SquatType) {
+        self.squat_type = Some(squat_type);
+    }
 }
 
 #[derive(Debug)]
@@ -40,5 +44,9 @@ impl CompilerGlobal {
 
     pub fn get_type(&self) -> SquatType {
         self.squat_type.as_ref().unwrap_or(&SquatType::Nil).clone()
+    }
+
+    pub fn set_type(&mut self, squat_type: SquatType) {
+        self.squat_type = Some(squat_type);
     }
 }
