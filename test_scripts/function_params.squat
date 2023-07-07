@@ -11,6 +11,7 @@ func sumup(int param1, int param2) int {
 }
 
 func main() {
+    println("hello there");
     func0();
     func1(10);
     int s;

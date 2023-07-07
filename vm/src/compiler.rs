@@ -205,48 +205,29 @@ impl<'a> Compiler<'a> {
         };
 
         self.consume_current(TokenType::LeftParenthesis, "Expect '(' after function name.");
+        let is_main: bool;
         if func_name == "main" {
             if self.found_main {
                 self.compile_error("Cannot have more then 1 main function");
             }
-
-            let old_scope_type = self.scope_type;
-            let old_scope_stack_index = self.scope_stack_index;
-            self.scope_stack_index = self.locals.len();
-            self.scope_type = ScopeType::Function;
-
-            self.begin_scope();
-
             self.found_main = true;
-            self.consume_current(
-                TokenType::RightParenthesis,
-                "Expect closing ')'. Function 'main' does not take arguments."
-            ); 
-            self.consume_current(TokenType::LeftBrace, "Expected '{' to define function body");
-
-            let jump = self.emit_jump(OpCode::Jump(usize::MAX));
-            self.write_op_code(OpCode::Start);
-            self.main_start = self.main_chunk.get_size();
-
-            self.block();
-
-            self.end_scope();
-            self.write_op_code(OpCode::Stop);
-            self.patch_jump(jump);
-
-            self.scope_type = old_scope_type;
-            self.scope_stack_index = old_scope_stack_index;
+            is_main = true;
         } else {
-            let old_scope_type = self.scope_type;
-            let old_scope_stack_index = self.scope_stack_index;
-            self.scope_stack_index = self.locals.len();
-            self.scope_type = ScopeType::Function;
+            is_main = false;
+        }
+        let old_scope_type = self.scope_type;
+        let old_scope_stack_index = self.scope_stack_index;
+        self.scope_stack_index = self.locals.len();
+        self.scope_type = ScopeType::Function;
 
+        if !is_main {
             self.initialize_function(&func_name);
-            self.begin_scope();
+        }
+        self.begin_scope();
 
-            let jump = self.emit_jump(OpCode::Jump(usize::MAX));
-            let mut param_types: Vec<SquatType> = Vec::with_capacity(255);
+        let jump = self.emit_jump(OpCode::Jump(usize::MAX));
+        let mut param_types: Vec<SquatType> = Vec::with_capacity(255);
+        if !is_main {
             if !self.check_current(TokenType::RightParenthesis) {
                 param_types.push(match self.get_variable_type() {
                     Ok(value) => value,
@@ -271,23 +252,39 @@ impl<'a> Compiler<'a> {
                 }
                 self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
             }
+        } else {
+            self.consume_current(TokenType::RightParenthesis, "Expect closing ')'");
+        }
 
-            let return_type = match self.check_variable_type() {
+        let return_type: SquatType;
+        if !is_main {
+            return_type = match self.check_variable_type() {
                 Some(value) => value,
                 None => SquatType::Nil,
             };
+        } else {
+            return_type = SquatType::Int
+        }
 
-            self.consume_current(TokenType::LeftBrace, "Expected '{' to define function body");
+        self.consume_current(TokenType::LeftBrace, "Expected '{' to define function body");
 
-            self.write_op_code(OpCode::Start);
-            let starting_index = self.main_chunk.get_size() - 1;
-            
-            self.block();
-            self.end_scope();
+        self.write_op_code(OpCode::Start);
+        if is_main {
+            self.main_start = self.main_chunk.get_size();
+        }
+        let starting_index = self.main_chunk.get_size() - 1;
+
+        self.block();
+        self.end_scope();
+        if is_main {
+            self.write_op_code(OpCode::Stop);
+        } else {
             self.write_op_code(OpCode::Nil);
             self.write_op_code(OpCode::Return);
+        }
 
-            self.patch_jump(jump);
+        self.patch_jump(jump);
+        if !is_main {
             let arity = param_types.len();
             self.patch_function(
                 &func_name,
@@ -295,8 +292,8 @@ impl<'a> Compiler<'a> {
                     arity,
                     param_types,
                     return_type
-                )
-            );
+                    )
+                );
 
             let function_obj = SquatObject::Function(
                 SquatFunction::new(&func_name, starting_index, arity)
@@ -304,10 +301,10 @@ impl<'a> Compiler<'a> {
             let constant_index = self.constants.write(SquatValue::Object(function_obj));
             self.write_op_code(OpCode::Constant(constant_index));
             self.define_function(index);
-
-            self.scope_type = old_scope_type;
-            self.scope_stack_index = old_scope_stack_index;
         }
+
+        self.scope_type = old_scope_type;
+        self.scope_stack_index = old_scope_stack_index;
     }
 
     fn var_declaration(&mut self, squat_type: Option<SquatType>) {
@@ -476,11 +473,11 @@ impl<'a> Compiler<'a> {
     }
 
     fn return_statement(&mut self) {
-        if self.check_current(TokenType::Semicolon) {
-            self.write_op_code(OpCode::Nil);
-            self.write_op_code(OpCode::Return);
-            return;
-        }
+        // if self.check_current(TokenType::Semicolon) {
+        //     self.write_op_code(OpCode::Nil);
+        //     self.write_op_code(OpCode::Return);
+        //     return;
+        // }
         self.expression();
         self.consume_current(TokenType::Semicolon, "Expected ';' after return value");
         self.write_op_code(OpCode::Return);
@@ -604,8 +601,8 @@ impl<'a> Compiler<'a> {
             self.previous_token.as_ref().unwrap().token_type,
             expected_type.clone()
         );
-        if !self.check_types(expected_type, &prefix_type) {
-            return SquatType::Nil;
+        if !self.check_types(expected_type.clone(), &prefix_type) {
+            return expected_type.unwrap();
         }
 
         while precedence <= self.get_precedence(
@@ -687,16 +684,12 @@ impl<'a> Compiler<'a> {
         if let Some((_, SquatType::Function(data), _)) = self.resolve_global(&self.last_func_name.clone()) {
             let mut arg_count = 0;
             if !self.check_current(TokenType::RightParenthesis) {
-                let expression_type = self.expression();
-                self.check_types(Some(data.get_param_type(arg_count)), &expression_type);
-                arg_count += 1;
-
-                while self.check_current(TokenType::Comma) {
+                while !self.check_current(TokenType::RightParenthesis) {
                     let expression_type = self.expression();
                     self.check_types(Some(data.get_param_type(arg_count)), &expression_type);
                     arg_count += 1;
+                    self.check_current(TokenType::Comma);
                 }
-                self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
             }
 
             self.write_op_code(OpCode::Call(arg_count));
@@ -705,16 +698,12 @@ impl<'a> Compiler<'a> {
             // Repeated code cuz borrow checker does not want a local closure owning self :(
             let mut arg_count = 0;
             if !self.check_current(TokenType::RightParenthesis) {
-                let expression_type = self.expression();
-                self.check_types(Some(data.get_param_type(arg_count)), &expression_type);
-                arg_count += 1;
-
-                while self.check_current(TokenType::Comma) {
+                while !self.check_current(TokenType::RightParenthesis) {
                     let expression_type = self.expression();
                     self.check_types(Some(data.get_param_type(arg_count)), &expression_type);
                     arg_count += 1;
+                    self.check_current(TokenType::Comma);
                 }
-                self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
             }
 
             self.write_op_code(OpCode::Call(arg_count));
@@ -724,14 +713,11 @@ impl<'a> Compiler<'a> {
             // TODO this is temporary code for the native calls
             let mut arg_count = 0;
             if !self.check_current(TokenType::RightParenthesis) {
-                self.expression();
-                arg_count += 1;
-
-                while self.check_current(TokenType::Comma) {
+                while !self.check_current(TokenType::RightParenthesis) {
                     self.expression();
                     arg_count += 1;
+                    self.check_current(TokenType::Comma);
                 }
-                self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
             }
 
             self.write_op_code(OpCode::Call(arg_count));
@@ -975,12 +961,10 @@ impl<'a> Compiler<'a> {
         self.panic_mode = false;
         while self.current_token.as_ref().unwrap().token_type != TokenType::Eof {
             match self.current_token.as_ref().unwrap().token_type {
-                TokenType::Class | TokenType::Func | TokenType::Var | TokenType::For |
-                    TokenType::If | TokenType::While | TokenType::BoolType |
-                    TokenType::IntType | TokenType::FloatType | TokenType::StringType |
-                    TokenType::Return | TokenType::Semicolon => {
-                        break;
-                    },
+                TokenType::RightBrace | TokenType::Semicolon => {
+                    self.advance();
+                    break;
+                },
                 _ => {}
             }
             self.advance();
@@ -1079,7 +1063,7 @@ impl<'a> Compiler<'a> {
             TokenType::Identifier                               => self.variable(),
             TokenType::Eof                                      => SquatType::Nil,
             _ => { 
-                self.compile_error("This token is not siutable for an expression start");
+                self.compile_error("Illegal expression");
                 SquatType::Nil
             }
         }
