@@ -161,12 +161,43 @@ impl<'a> Compiler<'a> {
         }
         false
     }
+
+    fn function_type_declratation(&mut self) {
+        let mut function_data: SquatFunctionTypeData = Default::default();
+        if !self.check_current(TokenType::RightParenthesis) {
+            function_data.param_types.push(match self.get_variable_type() {
+                Ok(value) => value,
+                Err(()) => return,
+            });
+
+            while self.check_current(TokenType::Comma) {
+                function_data.param_types.push(match self.get_variable_type() {
+                    Ok(value) => value,
+                    Err(()) => return,
+                });
+            }
+        }
+        self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
+
+        function_data.set_return_type(match self.check_variable_type() {
+            Some(value) => value,
+            None => SquatType::Nil,
+        });
+
+        let function_type = SquatType::Function(function_data);
+
+        self.var_declaration(Some(function_type));
+    }
     
     fn declaration_global(&mut self) {
         if self.check_current(TokenType::Semicolon) {
             self.compile_warning("Unnecessary ';'");
         } else if self.check_current(TokenType::Func) {
-            self.function_declaration();
+            if self.check_current(TokenType::LeftParenthesis) {
+                self.function_type_declratation();
+            } else {
+                self.function_declaration();
+            }
         } else if self.try_var_declaration() {
         } else if self.check_current(TokenType::Return) {
             self.compile_error("Cannot return from outside a function.");
@@ -179,11 +210,15 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    fn declaration_function(&mut self, expected_return_type: SquatType) {
+    fn declaration_local(&mut self, expected_return_type: SquatType) {
         if self.check_current(TokenType::Semicolon) {
             self.compile_warning("Unnecessary ';'");
         } else if self.check_current(TokenType::Func) {
-            self.function_declaration();
+            if self.check_current(TokenType::LeftParenthesis) {
+                self.function_type_declratation();
+            } else {
+                self.function_declaration();
+            }
         } else if self.try_var_declaration() {
         } else if self.check_current(TokenType::Return) {
             self.return_statement(expected_return_type);
@@ -197,7 +232,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn function_declaration(&mut self) {
-        let (index, func_name) = match self.parse_variable("Expect variable name") {
+        let (index, func_name) = match self.parse_variable("Expect function name") {
             Ok(value) => value,
             Err(()) => {
                 return;
@@ -585,7 +620,7 @@ impl<'a> Compiler<'a> {
                 self.compile_error("Expected closing '}' to end the block");
                 break;
             }
-            self.declaration_function(expected_return_type.clone());
+            self.declaration_local(expected_return_type.clone());
         }
     }
 

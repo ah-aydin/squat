@@ -20,4 +20,6 @@ func main() {
 
     int m = 10 < 10 ? 1 : 2;
     println("var m is", m, type(m));
+
+    func(int, int) int very_important_func = sumup;
 }
