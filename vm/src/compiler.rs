@@ -179,14 +179,14 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    fn declaration_function(&mut self) {
+    fn declaration_function(&mut self, expected_return_type: SquatType) {
         if self.check_current(TokenType::Semicolon) {
             self.compile_warning("Unnecessary ';'");
         } else if self.check_current(TokenType::Func) {
             self.function_declaration();
         } else if self.try_var_declaration() {
         } else if self.check_current(TokenType::Return) {
-            self.return_statement();
+            self.return_statement(expected_return_type);
         } else {
             self.statement();
         }
@@ -274,7 +274,7 @@ impl<'a> Compiler<'a> {
         }
         let starting_index = self.main_chunk.get_size() - 1;
 
-        self.block();
+        self.block(return_type.clone());
         self.end_scope();
         if is_main {
             self.write_op_code(OpCode::Stop);
@@ -472,13 +472,17 @@ impl<'a> Compiler<'a> {
         self.write_op_code(OpCode::DefineGlobal(index));
     }
 
-    fn return_statement(&mut self) {
-        // if self.check_current(TokenType::Semicolon) {
-        //     self.write_op_code(OpCode::Nil);
-        //     self.write_op_code(OpCode::Return);
-        //     return;
-        // }
-        self.expression();
+    fn return_statement(&mut self, expected_return_type: SquatType) {
+        let expression_type = self.expression();
+        if expected_return_type != expression_type {
+            self.compile_error(
+                &format!(
+                    "Function has return type '{}' but '{}' was given",
+                    expected_return_type,
+                    expression_type
+                )
+            );
+        }
         self.consume_current(TokenType::Semicolon, "Expected ';' after return value");
         self.write_op_code(OpCode::Return);
     }
@@ -492,7 +496,7 @@ impl<'a> Compiler<'a> {
             self.for_statement();
         } else if self.check_current(TokenType::LeftBrace) {
             self.begin_scope();
-            self.block();
+            self.block(SquatType::Nil);
             self.end_scope();
         } else {
             self.expression_statement();
@@ -575,13 +579,13 @@ impl<'a> Compiler<'a> {
         self.end_scope();
     }
 
-    fn block(&mut self) {
+    fn block(&mut self, expected_return_type: SquatType) {
         while !self.check_current(TokenType::RightBrace) {
             if self.check_current(TokenType::Eof) {
                 self.compile_error("Expected closing '}' to end the block");
                 break;
             }
-            self.declaration_function();
+            self.declaration_function(expected_return_type.clone());
         }
     }
 
