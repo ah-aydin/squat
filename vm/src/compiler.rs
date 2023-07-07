@@ -162,18 +162,18 @@ impl<'a> Compiler<'a> {
         false
     }
 
-    fn function_type_declratation(&mut self) {
+    fn function_type_declratation(&mut self) -> SquatType {
         let mut function_data: SquatFunctionTypeData = Default::default();
         if !self.check_current(TokenType::RightParenthesis) {
             function_data.param_types.push(match self.get_variable_type() {
                 Ok(value) => value,
-                Err(()) => return,
+                Err(()) => return SquatType::Nil,
             });
 
             while self.check_current(TokenType::Comma) {
                 function_data.param_types.push(match self.get_variable_type() {
                     Ok(value) => value,
-                    Err(()) => return,
+                    Err(()) => return SquatType::Nil,
                 });
             }
         }
@@ -186,7 +186,8 @@ impl<'a> Compiler<'a> {
 
         let function_type = SquatType::Function(function_data);
 
-        self.var_declaration(Some(function_type));
+        self.var_declaration(Some(function_type.clone()));
+        function_type
     }
     
     fn declaration_global(&mut self) {
@@ -324,7 +325,6 @@ impl<'a> Compiler<'a> {
             self.patch_function(
                 &func_name,
                 SquatFunctionTypeData::new(
-                    arity,
                     param_types,
                     return_type
                     )
@@ -375,6 +375,10 @@ impl<'a> Compiler<'a> {
                 SquatType::Bool => {
                     var_type = SquatType::Bool;
                     self.constants.write(SquatValue::Bool(false))
+                },
+                SquatType::Function(data) => {
+                    var_type = SquatType::Function(data);
+                    self.constants.write(SquatValue::Object(SquatObject::Function(Default::default())))
                 },
                 _ => unreachable!("var_declaration")
             };
@@ -913,10 +917,13 @@ impl<'a> Compiler<'a> {
             self.write_op_code(set_op_code);
         } else {
             self.write_op_code(get_op_code);
-        }
-
-        if is_func {
-            self.last_func_data = func_data.unwrap();
+            if is_func {
+                self.last_func_data = func_data.as_ref().unwrap().clone();
+                if self.check_current(TokenType::LeftParenthesis) {
+                    return self.call();
+                }
+                return func_data.unwrap();
+            }
         }
 
         variable_type

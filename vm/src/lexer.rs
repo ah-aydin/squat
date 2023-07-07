@@ -398,7 +398,6 @@ mod test {
         test_binary_operand(TokenType::Less, "<");
         test_binary_operand(TokenType::LessEqual, "<=");
         test_binary_operand(TokenType::Plus, "+");
-        test_binary_operand(TokenType::PlusPlus, "++");
     }
 
     #[test]

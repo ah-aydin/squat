@@ -10,7 +10,7 @@ pub struct SquatNativeFunctionTypeData {
 impl SquatNativeFunctionTypeData {
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct SquatFunctionTypeData {
     pub arity: usize,
     pub param_types: Vec<SquatType>,
@@ -19,12 +19,11 @@ pub struct SquatFunctionTypeData {
 
 impl SquatFunctionTypeData {
     pub fn new(
-        arity: usize,
         param_types: Vec<SquatType>,
         return_type: SquatType
     ) -> SquatFunctionTypeData {
         SquatFunctionTypeData {
-            arity,
+            arity: param_types.len(),
             param_types,
             return_type: Box::new(return_type)
         }
@@ -40,6 +39,13 @@ impl SquatFunctionTypeData {
 
     pub fn get_param_type(&self, arg_count: usize) -> SquatType {
         self.param_types.get(arg_count).unwrap().clone()
+    }
+}
+
+impl PartialEq for SquatFunctionTypeData {
+    fn eq(&self, other: &Self) -> bool {
+        return self.param_types == other.param_types
+            && self.get_return_type() == other.get_return_type();
     }
 }
 
@@ -71,13 +77,14 @@ impl fmt::Display for SquatType {
             SquatType::Bool => write!(f, "<type Bool>"),
             SquatType::Function(data) => write!(
                 f,
-                "<type Function ({})>",
+                "<type Function ({}) {}>",
                 data
                     .param_types
                     .iter()
                     .map(|x| x.to_string()).
                     collect::<Vec<String>>().
-                    join(" ")
+                    join(" "),
+                data.get_return_type()
             ),
             SquatType::NativeFunction=> write!(f, "<type NativeFunction>"),
             SquatType::Type => write!(f, "<type Type>"),
@@ -85,3 +92,26 @@ impl fmt::Display for SquatType {
     }
 }
 
+#[cfg(test)]
+mod test {
+    use super::*;
+    
+    #[test]
+    fn test_function_type_equality() {
+        let func1_type = SquatType::Function(SquatFunctionTypeData::new(vec![], SquatType::Nil));
+        let func2_type = SquatType::Function(SquatFunctionTypeData::new(vec![], SquatType::Nil));
+        assert_eq!(func1_type, func2_type);
+
+        let func1_type = SquatType::Function(SquatFunctionTypeData::new(vec![], SquatType::Int));
+        let func2_type = SquatType::Function(SquatFunctionTypeData::new(vec![], SquatType::Int));
+        assert_eq!(func1_type, func2_type);
+
+        let func1_type = SquatType::Function(SquatFunctionTypeData::new(vec![SquatType::Int], SquatType::Int));
+        let func2_type = SquatType::Function(SquatFunctionTypeData::new(vec![SquatType::Int], SquatType::Int));
+        assert_eq!(func1_type, func2_type);
+
+        let func1_type = SquatType::Function(SquatFunctionTypeData::new(vec![SquatType::Int, SquatType::String], SquatType::Int));
+        let func2_type = SquatType::Function(SquatFunctionTypeData::new(vec![SquatType::Int, SquatType::String], SquatType::Int));
+        assert_eq!(func1_type, func2_type);
+    }
+}
