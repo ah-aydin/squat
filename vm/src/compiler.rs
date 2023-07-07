@@ -72,7 +72,7 @@ pub struct Compiler<'a> {
     scope_type: ScopeType,
     scope_stack_index: usize,
 
-    last_func_name: String,
+    last_func_data: SquatType,
     had_error: bool,
     panic_mode: bool,
 
@@ -103,7 +103,7 @@ impl<'a> Compiler<'a> {
             scope_type: ScopeType::Global,
             scope_stack_index: 0,
 
-            last_func_name: String::from(""),
+            last_func_data: SquatType::Nil,
             had_error: false,
             panic_mode: false,
 
@@ -681,50 +681,38 @@ impl<'a> Compiler<'a> {
     }
 
     fn call(&mut self) -> SquatType {
-        if let Some((_, SquatType::Function(data), _)) = self.resolve_global(&self.last_func_name.clone()) {
-            let mut arg_count = 0;
-            if !self.check_current(TokenType::RightParenthesis) {
-                while !self.check_current(TokenType::RightParenthesis) {
-                    let expression_type = self.expression();
-                    self.check_types(Some(data.get_param_type(arg_count)), &expression_type);
-                    arg_count += 1;
-                    self.check_current(TokenType::Comma);
+        let func_data = self.last_func_data.clone();
+        match func_data {
+            SquatType::Function(data) => {
+                let mut arg_count = 0;
+                if !self.check_current(TokenType::RightParenthesis) {
+                    while !self.check_current(TokenType::RightParenthesis) {
+                        let expression_type = self.expression();
+                        self.check_types(Some(data.get_param_type(arg_count)), &expression_type);
+                        arg_count += 1;
+                        self.check_current(TokenType::Comma);
+                    }
                 }
-            }
 
-            self.write_op_code(OpCode::Call(arg_count));
-            return data.get_return_type();
-        } else if let Some((_, SquatType::Function(data), _)) = self.resolve_local(&self.last_func_name.clone()) {
-            // Repeated code cuz borrow checker does not want a local closure owning self :(
-            let mut arg_count = 0;
-            if !self.check_current(TokenType::RightParenthesis) {
-                while !self.check_current(TokenType::RightParenthesis) {
-                    let expression_type = self.expression();
-                    self.check_types(Some(data.get_param_type(arg_count)), &expression_type);
-                    arg_count += 1;
-                    self.check_current(TokenType::Comma);
+                self.write_op_code(OpCode::Call(arg_count));
+                data.get_return_type()
+            },
+            SquatType::NativeFunction => {
+                // TODO this is temporary code for the native calls
+                let mut arg_count = 0;
+                if !self.check_current(TokenType::RightParenthesis) {
+                    while !self.check_current(TokenType::RightParenthesis) {
+                        self.expression();
+                        arg_count += 1;
+                        self.check_current(TokenType::Comma);
+                    }
                 }
-            }
 
-            self.write_op_code(OpCode::Call(arg_count));
-            return data.get_return_type();
+                self.write_op_code(OpCode::Call(arg_count));
+                SquatType::Nil
+            }
+            _ => unreachable!("call")
         }
-        if let Some((_, SquatType::NativeFunction, _)) = self.resolve_native(&self.last_func_name.clone()) {
-            // TODO this is temporary code for the native calls
-            let mut arg_count = 0;
-            if !self.check_current(TokenType::RightParenthesis) {
-                while !self.check_current(TokenType::RightParenthesis) {
-                    self.expression();
-                    arg_count += 1;
-                    self.check_current(TokenType::Comma);
-                }
-            }
-
-            self.write_op_code(OpCode::Call(arg_count));
-            return SquatType::Nil;
-        }
-        self.compile_error("WTF IS GOING ON HERE");
-        unreachable!("call")
     }
 
     fn expression_with_type(&mut self, expected_type: Option<SquatType>) -> SquatType {
@@ -813,6 +801,7 @@ impl<'a> Compiler<'a> {
         let set_op_code: OpCode;
         let get_op_code: OpCode;
         let variable_type: SquatType;
+        let mut func_data: Option<SquatType> = None;
         let is_func: bool;
 
         if let Some((index, t, b)) = self.resolve_local(&var_name) {
@@ -820,6 +809,7 @@ impl<'a> Compiler<'a> {
             get_op_code = OpCode::GetLocal(index - self.scope_stack_index);
             is_func = b;
             if is_func {
+                func_data = Some(t.clone());
                 variable_type = match t {
                     SquatType::Function(data) => data.get_return_type(),
                     _ => unreachable!()
@@ -832,6 +822,7 @@ impl<'a> Compiler<'a> {
             get_op_code = OpCode::GetGlobal(index);
             is_func = b;
             if is_func {
+                func_data = Some(t.clone());
                 variable_type = match t {
                     SquatType::Function(data) => data.get_return_type(),
                     _ => unreachable!()
@@ -844,6 +835,7 @@ impl<'a> Compiler<'a> {
             get_op_code = OpCode::GetNative(index);
             is_func = b;
             if is_func {
+                func_data = Some(t.clone());
                 variable_type = match t {
                     // TODO temporary code
                     SquatType::NativeFunction => SquatType::Nil,
@@ -884,7 +876,7 @@ impl<'a> Compiler<'a> {
         }
 
         if is_func {
-            self.last_func_name = var_name;
+            self.last_func_data = func_data.unwrap();
         }
 
         variable_type
