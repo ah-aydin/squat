@@ -611,8 +611,7 @@ impl<'a> Compiler<'a> {
             self.advance();
 
             if self.check_previous(TokenType::Question) {
-                self.ternary();
-                continue;
+                return self.ternary(expected_type);
             }
             self.call_infix(
                 self.previous_token.as_ref().unwrap().token_type,
@@ -623,18 +622,20 @@ impl<'a> Compiler<'a> {
         prefix_type
     }
 
-    fn ternary(&mut self) {
+    fn ternary(&mut self, expected_type: Option<SquatType>) -> SquatType {
         let else_jump = self.emit_jump(OpCode::JumpIfFalse(usize::MAX));
         self.write_op_code(OpCode::Pop);
-        self.parse_precedence(Precedence::Ternary + 1, None);
+        let expression_type = self.parse_precedence(Precedence::Ternary + 1, expected_type.clone());
 
         let end_jump = self.emit_jump(OpCode::Jump(usize::MAX));
         self.patch_jump(else_jump);
         self.write_op_code(OpCode::Pop);
         self.consume_current(TokenType::Colon, "Expect ':' after true ternary block");
 
-        self.parse_precedence(Precedence::Ternary + 1, None);
+        self.parse_precedence(Precedence::Ternary + 1, Some(expression_type.clone()));
         self.patch_jump(end_jump);
+
+        expression_type
     }
 
     fn and(&mut self) -> SquatType {

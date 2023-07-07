@@ -17,4 +17,7 @@ func main() {
     int s;
     s = sumup(10, sumup(1, 2));
     println("The sum of the values are", s);
+
+    int m = 10 < 10 ? 1 : 2;
+    println("var m is", m, type(m));
 }
