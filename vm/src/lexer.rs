@@ -63,6 +63,7 @@ impl<'a> Lexer<'a> {
                 ']' => Ok(self.make_token(TokenType::RightBracket)),
                 ',' => Ok(self.make_token(TokenType::Comma)),
                 '.' => Ok(self.make_token(TokenType::Dot)),
+                '+' => Ok(self.make_token(TokenType::Plus)),
                 '-' => Ok(self.make_token(TokenType::Minus)),
                 ';' => Ok(self.make_token(TokenType::Semicolon)),
                 '/' => Ok(self.make_token(TokenType::Slash)),
@@ -140,23 +141,6 @@ impl<'a> Lexer<'a> {
                         )
                     }
                 },
-                '+' => {
-                    if let Some(c) = self.source_iterator.peek() {
-                        if *c == '+' {
-                            self.advance();
-                            Ok(self.make_token(TokenType::PlusPlus))
-                        } else {
-                            Ok(self.make_token(TokenType::Plus))
-                        }
-                    } else {
-                        Err(
-                            LexerError::InternalError {
-                                msg: "Could not peek source_iterator".to_owned(),
-                                line: self.line
-                            }
-                        )
-                    }
-                }
 
                 // Literals
                 '"' => {
@@ -270,6 +254,12 @@ impl<'a> Lexer<'a> {
                 "true" =>       Some(self.make_token(TokenType::True)),
                 "var" =>        Some(self.make_token(TokenType::Var)),
                 "while" =>      Some(self.make_token(TokenType::While)),
+                
+                "bool" =>       Some(self.make_token(TokenType::BoolType)),
+                "float" =>      Some(self.make_token(TokenType::FloatType)),
+                "int" =>        Some(self.make_token(TokenType::IntType)),
+                "string" =>     Some(self.make_token(TokenType::StringType)),
+
                 _ =>            Some(self.make_token(TokenType::Identifier))
             }
         }
@@ -408,7 +398,6 @@ mod test {
         test_binary_operand(TokenType::Less, "<");
         test_binary_operand(TokenType::LessEqual, "<=");
         test_binary_operand(TokenType::Plus, "+");
-        test_binary_operand(TokenType::PlusPlus, "++");
     }
 
     #[test]
@@ -433,7 +422,7 @@ mod test {
 
     #[test]
     fn keywords() {
-        let code = String::from("and break class else extends false for func if nil or print return static super this true var while");
+        let code = String::from("and break class else extends false for func if nil or return static super this true var while");
         let mut lexer = Lexer::new(&code);
         assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::And, "and"));
         assert_eq!(lexer.scan_token(), make_token_line_1(TokenType::Break, "break"));

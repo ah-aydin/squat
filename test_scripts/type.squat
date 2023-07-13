@@ -1,0 +1,27 @@
+func main() {
+    int a = 1 + 2;
+    string s = "ofya";
+    var c = -10;
+    c = 2;
+    c = -4 + a;
+    println("c is", c, type(c));
+    println("Type of s is:", type(s));
+    println("Type of a is:", type(a));
+    if (1 == 2) {
+        println("1 is 2");
+    } else {
+        println("1 is" + " not 2");
+    }
+    var meh = !c;
+    println(meh, type(meh));
+
+    for (int i = 0; i <= 5; i = i + 1) {
+        println(i);
+    }
+    for (string i = "a"; i != "aaaa"; i = i + "a") {
+        println(i);
+    }
+
+    int g;
+    println(g, type(g));
+}

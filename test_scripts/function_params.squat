@@ -1,0 +1,42 @@
+func func0() {
+    println("This is ", func0);
+}
+
+func func1(int param1) {
+    println("This is ", func0, "with param:", param1);
+}
+
+func sumup(int param1, int param2) int {
+    return param1 + param2;
+}
+
+func call_a_func_with_param_int(func(int) fn, int param) {
+    println("Calling call_a_func_with_param_int");
+    fn(param);
+}
+
+func call_a_func_with_param_int_int_return_int(int param1, int param2, func(int, int) int fn) int {
+    println("Calling function with 2 int and return int param");
+    int value = fn(param1, param2);
+    println("The value is", value, ". Returning value times 2");
+    return value * 2;
+}
+
+func main() {
+    println("hello there");
+    func0();
+    func1(10);
+    int s;
+    s = sumup(10, sumup(1, 2));
+    println("The sum of the values are", s);
+
+    int m = 10 < 10 ? 1 : 2;
+    println("var m is", m, type(m));
+
+    func(int, int) int very_important_func = sumup;
+    var meh = very_important_func(10, 90);
+    println("The very important function sum is", meh);
+
+    call_a_func_with_param_int(func1, 1234);
+    println("The returned value is:", call_a_func_with_param_int_int_return_int(99, 99, sumup));
+}

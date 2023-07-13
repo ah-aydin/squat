@@ -13,10 +13,7 @@ use std::fs;
 use options::Options;
 use vm::{VM, InterpretResult};
 
-use crate::value::squat_value::SquatValue;
-
-
-fn run_file(opts: &Options) -> Result<(),()> {
+fn run_file(opts: &Options) -> Result<i64, i64> {
     let mut vm = VM::new();
 
     let source = match fs::read_to_string(&opts.file) {
@@ -27,31 +24,22 @@ fn run_file(opts: &Options) -> Result<(),()> {
 
     let result = vm.interpret_source(source, opts);
 
-    if result == InterpretResult::InterpretCompileError {
-        println!("CompileError");
-        return Err(());
-    } else if result == InterpretResult::InterpretRuntimeError {
-        println!("RuntimeError");
-        return Err(());
-    } else if let InterpretResult::InterpretOk(value) = result {
-        let exit_code = match value {
-            SquatValue::Nil => 0.,
-            SquatValue::Number(value) => value,
-            _ => {
-                println!("[ERROR] Function 'main' can only return numbers");
-                return Ok(());
-            }
-        };
-
-        println!("\nExit code: {exit_code}");
+    match result {
+        InterpretResult::InterpretOk(exit_code) => Ok(exit_code),
+        InterpretResult::InterpretCompileError => Err(-1),
+        InterpretResult::InterpretRuntimeError => Err(-1),
     }
-    
-    return Ok(());
 }
 
-fn main() -> Result<(), ()> {
+fn cmain() -> i32 {
     env_logger::init();
     let opts = Options::parse();
 
-    run_file(&opts)
+    match run_file(&opts) {
+        Ok(i) | Err(i) => i as i32,
+    }
+}
+
+fn main() {
+    std::process::exit(cmain());
 }
