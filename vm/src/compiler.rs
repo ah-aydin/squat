@@ -162,16 +162,16 @@ impl<'a> Compiler<'a> {
         false
     }
 
-    fn function_type_declratation(&mut self) -> SquatType {
+    fn parse_function_type(&mut self) -> SquatType {
         let mut function_data: SquatFunctionTypeData = Default::default();
         if !self.check_current(TokenType::RightParenthesis) {
-            function_data.param_types.push(match self.get_variable_type() {
+            function_data.param_types.push(match self.get_parameter_type() {
                 Ok(value) => value,
                 Err(()) => return SquatType::Nil,
             });
 
             while self.check_current(TokenType::Comma) {
-                function_data.param_types.push(match self.get_variable_type() {
+                function_data.param_types.push(match self.get_parameter_type() {
                     Ok(value) => value,
                     Err(()) => return SquatType::Nil,
                 });
@@ -179,13 +179,16 @@ impl<'a> Compiler<'a> {
         }
         self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
 
-        function_data.set_return_type(match self.check_variable_type() {
+        function_data.set_return_type(match self.get_return_type() {
             Some(value) => value,
             None => SquatType::Nil,
         });
 
-        let function_type = SquatType::Function(function_data);
+        SquatType::Function(function_data)
+    }
 
+    fn function_var_declaration(&mut self) -> SquatType {
+        let function_type = self.parse_function_type();
         self.var_declaration(Some(function_type.clone()));
         function_type
     }
@@ -195,7 +198,7 @@ impl<'a> Compiler<'a> {
             self.compile_warning("Unnecessary ';'");
         } else if self.check_current(TokenType::Func) {
             if self.check_current(TokenType::LeftParenthesis) {
-                self.function_type_declratation();
+                self.function_var_declaration();
             } else {
                 self.function_declaration();
             }
@@ -216,7 +219,7 @@ impl<'a> Compiler<'a> {
             self.compile_warning("Unnecessary ';'");
         } else if self.check_current(TokenType::Func) {
             if self.check_current(TokenType::LeftParenthesis) {
-                self.function_type_declratation();
+                self.function_var_declaration();
             } else {
                 self.function_declaration();
             }
@@ -265,7 +268,7 @@ impl<'a> Compiler<'a> {
         let mut param_types: Vec<SquatType> = Vec::with_capacity(255);
         if !is_main {
             if !self.check_current(TokenType::RightParenthesis) {
-                param_types.push(match self.get_variable_type() {
+                param_types.push(match self.get_parameter_type() {
                     Ok(value) => value,
                     Err(()) => return,
                 });
@@ -276,7 +279,7 @@ impl<'a> Compiler<'a> {
                 self.define_variable(constant, &var_name, param_types.last().unwrap().clone());
 
                 while self.check_current(TokenType::Comma) {
-                    param_types.push(match self.get_variable_type() {
+                    param_types.push(match self.get_parameter_type() {
                         Ok(value) => value,
                         Err(()) => return,
                     });
@@ -294,7 +297,7 @@ impl<'a> Compiler<'a> {
 
         let return_type: SquatType;
         if !is_main {
-            return_type = match self.check_variable_type() {
+            return_type = match self.get_return_type() {
                 Some(value) => value,
                 None => SquatType::Nil,
             };
@@ -390,37 +393,49 @@ impl<'a> Compiler<'a> {
         self.define_variable(index, &name, var_type);
     }
 
-    fn get_variable_type(&mut self) -> Result<SquatType, ()> {
-        if self.check_current(TokenType::BoolType)
-            || self.check_current(TokenType::IntType)
-            || self.check_current(TokenType::FloatType)
-            || self.check_current(TokenType::StringType) {
-            return match self.previous_token.as_ref().unwrap().token_type {
-                TokenType::BoolType=> Ok(SquatType::Bool),
-                TokenType::IntType => Ok(SquatType::Int),
-                TokenType::FloatType => Ok(SquatType::Float),
-                TokenType::StringType => Ok(SquatType::String),
-                _ => unreachable!()
-            };
+    fn get_type(&mut self) -> Option<SquatType> {
+        match self.current_token.as_ref().unwrap().token_type {
+            TokenType::BoolType=> {
+                self.advance();
+                Some(SquatType::Bool)
+            },
+            TokenType::IntType => {
+                self.advance();
+                Some(SquatType::Int)
+            },
+            TokenType::FloatType => {
+                self.advance();
+                Some(SquatType::Float)
+            },
+            TokenType::StringType => {
+                self.advance();
+                Some(SquatType::String)
+            },
+            TokenType::Func => {
+                self.advance();
+                if !self.check_current(TokenType::LeftParenthesis) {
+                    self.compile_error("Expected opening '(' to define function type");
+                    None
+                } else {
+                    Some(self.parse_function_type())
+                }
+            }
+            _ => None
         }
-        self.compile_error("Expected variable type for function parameter");
-        Err(())
     }
 
-    fn check_variable_type(&mut self) -> Option<SquatType> {
-        if self.check_current(TokenType::BoolType)
-            || self.check_current(TokenType::IntType)
-            || self.check_current(TokenType::FloatType)
-            || self.check_current(TokenType::StringType) {
-            return match self.previous_token.as_ref().unwrap().token_type {
-                TokenType::BoolType=> Some(SquatType::Bool),
-                TokenType::IntType => Some(SquatType::Int),
-                TokenType::FloatType => Some(SquatType::Float),
-                TokenType::StringType => Some(SquatType::String),
-                _ => unreachable!()
-            };
+    fn get_parameter_type(&mut self) -> Result<SquatType, ()> {
+        match self.get_type() {
+            Some(paramter_type) => Ok(paramter_type),
+            None => {
+                self.compile_error("Expected variable type for function parameter");
+                Err(())
+            }
         }
-        None
+    }
+
+    fn get_return_type(&mut self) -> Option<SquatType> {
+        self.get_type()
     }
 
     /// Return value:
