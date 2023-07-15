@@ -1005,16 +1005,16 @@ impl<'a> Compiler<'a> {
                 Err(err) => {
                     match err {
                         LexerError::UndefinedToken { line, lexeme }
-                            => self.compile_error_token(
+                            => self.compile_error_at_line(
                                 line,
                                 &format!("undefined token '{}'", lexeme)
                             ),
                         LexerError::IncompleteComment { line }
-                            => self.compile_error_token(line, "incomplete comment"),
+                            => self.compile_error_at_line(line, "incomplete comment"),
                         LexerError::IncompleteString { line }
-                            => self.compile_error_token(line, "incomplete string"),
+                            => self.compile_error_at_line(line, "incomplete string"),
                         LexerError::InternalError { msg, line }
-                            => self.compile_error_token(line, &msg)
+                            => self.compile_error_at_line(line, &msg)
                     };
                 }
             }
@@ -1221,12 +1221,10 @@ impl<'a> Compiler<'a> {
 
     fn compile_error(&mut self, message: &str) {
         let line = self.previous_token.as_ref().unwrap().line;
-        println!("[ERROR] (Line {}) {}", line, message);
-        self.had_error = true;
-        self.panic_mode = true;
+        self.compile_error_at_line(line, message);
     }
 
-    fn compile_error_token(&mut self, line: u32, message: &str) {
+    fn compile_error_at_line(&mut self, line: u32, message: &str) {
         println!("[ERROR] (Line {}) {}", line, message);
         self.had_error = true;
         self.panic_mode = true;
