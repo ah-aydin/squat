@@ -39,4 +39,10 @@ func main() {
 
     call_a_func_with_param_int(func1, 1234);
     println("The returned value is:", call_a_func_with_param_int_int_return_int(99, 99, sumup));
+
+    func meh1() {
+        println("This is a local function");
+        println(s, s + 10);
+    }
+    meh1();
 }

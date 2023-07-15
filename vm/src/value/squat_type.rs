@@ -58,6 +58,7 @@ pub enum SquatType {
     Bool,
     Function(SquatFunctionTypeData),
     NativeFunction,
+    Class,
     Type,
 }
 
@@ -87,6 +88,7 @@ impl fmt::Display for SquatType {
                 data.get_return_type()
             ),
             SquatType::NativeFunction=> write!(f, "<type NativeFunction>"),
+            SquatType::Class => write!(f, "<type Class>"),
             SquatType::Type => write!(f, "<type Type>"),
         }
     }

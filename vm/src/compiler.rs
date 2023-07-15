@@ -116,7 +116,7 @@ impl<'a> Compiler<'a> {
         self.advance();
 
         while !self.check_current(TokenType::Eof) {
-            self.declaration_global();
+            self.declaration_statement(None);
         }
         self.main_chunk.write(OpCode::JumpTo(self.main_start), 0);
 
@@ -192,8 +192,8 @@ impl<'a> Compiler<'a> {
         self.var_declaration(Some(function_type.clone()));
         function_type
     }
-    
-    fn declaration_global(&mut self) {
+
+    fn declaration_statement(&mut self, expected_return_type: Option<SquatType>) {
         if self.check_current(TokenType::Semicolon) {
             self.compile_warning("Unnecessary ';'");
         } else if self.check_current(TokenType::Func) {
@@ -204,30 +204,16 @@ impl<'a> Compiler<'a> {
             }
         } else if self.try_var_declaration() {
         } else if self.check_current(TokenType::Return) {
-            self.compile_error("Cannot return from outside a function.");
-        } else {
-            self.compile_error("Statements are not allowed outside of function blocks.");
-        }
-
-        if self.panic_mode {
-            self.synchronize();
-        }
-    }
-
-    fn declaration_local(&mut self, expected_return_type: SquatType) {
-        if self.check_current(TokenType::Semicolon) {
-            self.compile_warning("Unnecessary ';'");
-        } else if self.check_current(TokenType::Func) {
-            if self.check_current(TokenType::LeftParenthesis) {
-                self.function_var_declaration();
-            } else {
-                self.function_declaration();
+            match self.scope_type {
+                ScopeType::Function => self.return_statement(expected_return_type.unwrap()),
+                _ => self.compile_error("Cannot return from outside a function."),
             }
-        } else if self.try_var_declaration() {
-        } else if self.check_current(TokenType::Return) {
-            self.return_statement(expected_return_type);
+            ;
         } else {
-            self.statement();
+            match self.scope_type {
+                ScopeType::Global => self.compile_error("Statements are not allowed outside of function blocks."),
+                ScopeType::Function => self.statement(),
+            }
         }
 
         if self.panic_mode {
@@ -639,7 +625,7 @@ impl<'a> Compiler<'a> {
                 self.compile_error("Expected closing '}' to end the block");
                 break;
             }
-            self.declaration_local(expected_return_type.clone());
+            self.declaration_statement(expected_return_type.clone().into());
         }
     }
 
