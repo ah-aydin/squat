@@ -23,17 +23,17 @@ pub fn pow(args: NativeFuncArgs) -> NativeFuncReturnType {
     }
 }
 
-pub fn number(args: NativeFuncArgs) -> NativeFuncReturnType {
+pub fn to_int(args: NativeFuncArgs) -> NativeFuncReturnType {
     match &args[0] {
         SquatValue::String(value) => {
-            match value.parse::<f64>() {
-                Ok(value) => Ok(SquatValue::Float(value)),
+            match value.parse::<i64>() {
+                Ok(value) => Ok(SquatValue::Int(value)),
                 Err(_) => Err(format!("Can't cast '{}' to a number", args[0])),
             }
         },
-        SquatValue::Float(value) => Ok(SquatValue::Float(*value)),
-        SquatValue::Bool(true) => Ok(SquatValue::Float(1.)),
-        SquatValue::Bool(false) => Ok(SquatValue::Float(0.)),
+        SquatValue::Float(value) => Ok(SquatValue::Int(*value as i64)),
+        SquatValue::Bool(true) => Ok(SquatValue::Int(1)),
+        SquatValue::Bool(false) => Ok(SquatValue::Int(0)),
         _ => Err(format!("Can't cast '{}' to a number", args[0]))
     }
 }

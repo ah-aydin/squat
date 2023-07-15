@@ -8,6 +8,13 @@ use crate::{native::{
 pub struct SquatClass {
     pub name: String,
 }
+impl SquatClass {
+    pub fn new(name: &str) -> SquatClass {
+        SquatClass {
+            name: name.to_string(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct SquatFunction {

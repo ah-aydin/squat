@@ -7,7 +7,7 @@ use crate::{
     },
     value::{
         squat_value::SquatValue,
-        ValueArray
+        ValueArray, squat_type::SquatType
     },
     native,
     options::Options,
@@ -386,20 +386,27 @@ impl VM {
     }
 
     fn define_native_functions(&mut self) {
-        self.define_native_func("input", Some(0), native::io::input);
-        self.define_native_func("print", None, native::io::print);
-        self.define_native_func("println", None, native::io::println);
+        self.define_native_func("input", Some(0), native::io::input, SquatType::String);
+        self.define_native_func("print", None, native::io::print, SquatType::Nil);
+        self.define_native_func("println", None, native::io::println, SquatType::Nil);
 
-        self.define_native_func("cbrt", Some(1), native::number::cbrt);
-        self.define_native_func("sqrt", Some(1), native::number::sqrt);
-        self.define_native_func("pow", Some(2), native::number::pow);
-        self.define_native_func("number", Some(1), native::number::number);
+        self.define_native_func("cbrt", Some(1), native::number::cbrt, SquatType::Float);
+        self.define_native_func("sqrt", Some(1), native::number::sqrt, SquatType::Float);
+        self.define_native_func("pow", Some(2), native::number::pow, SquatType::Float);
+        self.define_native_func("to_int", Some(1), native::number::to_int, SquatType::Int);
 
-        self.define_native_func("time", Some(0), native::misc::time);
-        self.define_native_func("type", Some(1), native::misc::get_type);
+        self.define_native_func("exit", Some(1), native::misc::exit, SquatType::Nil);
+        self.define_native_func("time", Some(0), native::misc::time, SquatType::Float);
+        self.define_native_func("type", Some(1), native::misc::get_type, SquatType::Type);
     }
 
-    fn define_native_func(&mut self, name: &str, arity: Option<usize>, func: native::NativeFunc) {
+    fn define_native_func(
+        &mut self,
+        name: &str,
+        arity: Option<usize>,
+        func: native::NativeFunc,
+        _return_type: SquatType
+    ) {
         let native_func = SquatNativeFunction::new(name, arity, func);
         let native_object = SquatObject::NativeFunction(native_func);
         let native_value = SquatValue::Object(native_object);

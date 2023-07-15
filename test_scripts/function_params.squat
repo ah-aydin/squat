@@ -12,7 +12,9 @@ func sumup(int param1, int param2) int {
 
 func call_a_func_with_param_int(func(int) fn, int param) {
     println("Calling call_a_func_with_param_int");
-    fn(param);
+    var param_number = 123123 + param;
+    println("Calling func", fn, "with param", param_number);
+    fn(param + param_number);
 }
 
 func call_a_func_with_param_int_int_return_int(int param1, int param2, func(int, int) int fn) int {
@@ -20,6 +22,9 @@ func call_a_func_with_param_int_int_return_int(int param1, int param2, func(int,
     int value = fn(param1, param2);
     println("The value is", value, ". Returning value times 2");
     return value * 2;
+}
+
+class TestClass {
 }
 
 func main() {
@@ -40,9 +45,20 @@ func main() {
     call_a_func_with_param_int(func1, 1234);
     println("The returned value is:", call_a_func_with_param_int_int_return_int(99, 99, sumup));
 
-    func meh1() {
-        println("This is a local function");
-        println(s, s + 10);
-    }
-    meh1();
+    
+    println(TestClass);
+    TestClass instance1;
+
+    println("hello there");
+    func0();
+    func1(10);
+    s = sumup(10, sumup(1, 2));
+    println("The sum of the values are", s);
+
+    println("var m is", m, type(m));
+
+    println("The very important function sum is", meh);
+
+    call_a_func_with_param_int(func1, 1234);
+    println("The returned value is:", call_a_func_with_param_int_int_return_int(99, 99, sumup));
 }

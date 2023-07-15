@@ -54,7 +54,7 @@ impl std::ops::Add<SquatValue> for SquatValue {
                 => SquatValue::String(s + &value.to_string()),
             (value, SquatValue::String(s))
                 => SquatValue::String(value.to_string() + &s),
-            _ => unreachable!()
+            (value1, value2) => unreachable!("{} {}", value1, value2)
         }
     }
 }

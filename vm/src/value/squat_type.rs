@@ -1,14 +1,23 @@
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct SquatNativeFunctionTypeData {
-    pub arity: usize,
-    pub param_types: Vec<Vec<SquatType>>,
-    return_type: Box<SquatType>
+pub struct SquatClassTypeData {
+    pub name: String
+}
+impl SquatClassTypeData {
+    pub fn new(name: &str) -> SquatClassTypeData {
+        SquatClassTypeData {
+            name: name.to_string()
+        }
+    }
 }
 
-impl SquatNativeFunctionTypeData {
-}
+// #[derive(Debug, Clone, PartialEq, Default)]
+// pub struct SquatNativeFunctionTypeData {
+//     pub arity: usize,
+//     pub param_types: Vec<Vec<SquatType>>,
+//     return_type: Box<SquatType>
+// }
 
 #[derive(Debug, Clone, Default)]
 pub struct SquatFunctionTypeData {
@@ -58,7 +67,7 @@ pub enum SquatType {
     Bool,
     Function(SquatFunctionTypeData),
     NativeFunction,
-    Class,
+    Class(SquatClassTypeData),
     Type,
 }
 
@@ -88,7 +97,7 @@ impl fmt::Display for SquatType {
                 data.get_return_type()
             ),
             SquatType::NativeFunction=> write!(f, "<type NativeFunction>"),
-            SquatType::Class => write!(f, "<type Class>"),
+            SquatType::Class(data) => write!(f, "<type Class {}>", data.name),
             SquatType::Type => write!(f, "<type Type>"),
         }
     }
