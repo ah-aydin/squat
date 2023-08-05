@@ -36,12 +36,12 @@ impl SquatFunction {
 #[derive(Debug, Clone)]
 pub struct SquatNativeFunction {
     pub name: String,
-    pub arity: Option<usize>,
+    pub arity: usize,
     function: NativeFunc
 }
 
 impl SquatNativeFunction {
-    pub fn new(name: &str, arity: Option<usize>, function: NativeFunc) -> SquatNativeFunction {
+    pub fn new(name: &str, arity: usize, function: NativeFunc) -> SquatNativeFunction {
         SquatNativeFunction { name: name.to_string(), arity , function }
     }
 
@@ -61,8 +61,8 @@ impl SquatObject {
     pub fn get_type(&self) -> SquatType {
         match self {
             SquatObject::Function(_) => SquatType::Function(Default::default()),
-            SquatObject::NativeFunction(_) => SquatType::NativeFunction,
-            SquatObject::Class(_) => SquatType::NativeFunction,
+            SquatObject::NativeFunction(_) => SquatType::NativeFunction(Default::default()),
+            SquatObject::Class(_) => SquatType::Class(Default::default()),
         }
     }
 }

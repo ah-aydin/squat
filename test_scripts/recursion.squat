@@ -1,20 +1,19 @@
 func fib(int depth) int {
     if (depth == 0) {
-        println(0);
         return 0;
     }
     if (depth == 1) {
-        println(1);
         return 1;
     }
     var value = fib(depth - 1) + fib(depth - 2);
-    println(value);
     return fib(depth - 1) + fib(depth - 2);
 }
 
 func main() {
     println("Gib index of fibonaci number");
-    //var fib_location = to_int(input());
-    var fib_location = 7;
-    println("Fibonaci number at location", fib_location, "is", fib(fib_location));
+    var fib_location = to_int(input());
+    print("Fibonaci number at location ");
+    print(fib_location);
+    print(" is ");
+    print(fib(fib_location));
 }

@@ -12,13 +12,6 @@ impl SquatClassTypeData {
     }
 }
 
-// #[derive(Debug, Clone, PartialEq, Default)]
-// pub struct SquatNativeFunctionTypeData {
-//     pub arity: usize,
-//     pub param_types: Vec<Vec<SquatType>>,
-//     return_type: Box<SquatType>
-// }
-
 #[derive(Debug, Clone, Default)]
 pub struct SquatFunctionTypeData {
     pub arity: usize,
@@ -58,7 +51,7 @@ impl PartialEq for SquatFunctionTypeData {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum SquatType {
     Nil,
     Int,
@@ -66,9 +59,11 @@ pub enum SquatType {
     String,
     Bool,
     Function(SquatFunctionTypeData),
-    NativeFunction,
+    NativeFunction(SquatFunctionTypeData),
     Class(SquatClassTypeData),
     Type,
+    Number,
+    Any
 }
 
 impl Default for SquatType {
@@ -89,16 +84,52 @@ impl fmt::Display for SquatType {
                 f,
                 "<type Function ({}) {}>",
                 data
-                    .param_types
-                    .iter()
-                    .map(|x| x.to_string()).
-                    collect::<Vec<String>>().
-                    join(" "),
+                .param_types
+                .iter()
+                .map(|x| x.to_string()).
+                collect::<Vec<String>>().
+                join(" "),
                 data.get_return_type()
             ),
-            SquatType::NativeFunction=> write!(f, "<type NativeFunction>"),
+            SquatType::NativeFunction(data) => write!(
+                f,
+                "<type NativeFunction ({}) {}>",
+                data
+                .param_types
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join(" "),
+                data.get_return_type()),
             SquatType::Class(data) => write!(f, "<type Class {}>", data.name),
             SquatType::Type => write!(f, "<type Type>"),
+            SquatType::Any => write!(f, "<type Any>"),
+            SquatType::Number => write!(f, "<type Number>")
+        }
+    }
+}
+
+impl PartialEq for SquatType {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (SquatType::Nil, SquatType::Nil) | 
+                (SquatType::Int, SquatType::Int) |
+                (SquatType::Float, SquatType::Float) |
+                (SquatType::Bool, SquatType::Bool) |
+                (SquatType::Type, SquatType::Type) |
+                (SquatType::String, SquatType::String) |
+                (SquatType::Any, _) |
+                (_, SquatType::Any) | 
+                (SquatType::Number, SquatType::Number) |
+                (SquatType::Number, SquatType::Int) |
+                (SquatType::Number, SquatType::Float) |
+                (SquatType::Int, SquatType::Number) |
+                (SquatType::Float, SquatType::Number) => true,
+            (SquatType::Function(data), SquatType::Function(data2)) |
+                (SquatType::NativeFunction(data), SquatType::NativeFunction(data2))
+                => data == data2,
+            (SquatType::Class(data), SquatType::Class(data2)) => data == data2,
+            (_, _) => false
         }
     }
 }

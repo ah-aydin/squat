@@ -3,11 +3,11 @@ use crate::{
     op_code::OpCode,
     compiler::{
         Compiler,
-        CompileStatus
+        CompileStatus, variable::CompilerNative
     },
     value::{
         squat_value::SquatValue,
-        ValueArray, squat_type::SquatType
+        ValueArray, squat_type::{SquatType, SquatFunctionTypeData}
     },
     native,
     options::Options,
@@ -47,7 +47,7 @@ pub struct VM {
     stack: Vec<SquatValue>,
     call_stack: Vec<CallFrame>,
     globals: Vec<Option<SquatValue>>,
-    natives: Vec<SquatValue>,
+    natives: Vec<CompilerNative>,
     constants: ValueArray,
     current_chunk: usize,
     chunks: Vec<Chunk>,
@@ -227,7 +227,7 @@ impl VM {
                     },
 
                     OpCode::GetNative(index) => {
-                        self.stack.push(self.natives[*index].clone());
+                        self.stack.push(self.natives[*index].get_value().clone());
                     },
 
                     OpCode::JumpTo(instruction_number) => {
@@ -290,17 +290,15 @@ impl VM {
                             _ => panic!("Call OpCode expects a FunctionObject on the stack")
                         };
 
-                        if let Some(arity) = native.arity {
-                            if arg_count != arity {
-                                self.runtime_error(
-                                    &format!(
-                                        "Function takes {} arguments but {} were given",
-                                        arity,
-                                        arg_count
-                                        )
-                                    );
-                                return InterpretResult::InterpretRuntimeError;
-                            }
+                        if arg_count != native.arity {
+                            self.runtime_error(
+                                &format!(
+                                    "Function takes {} arguments but {} were given",
+                                    native.arity,
+                                    arg_count
+                                    )
+                                );
+                            return InterpretResult::InterpretRuntimeError;
                         }
 
                         let mut args = Vec::new();
@@ -386,30 +384,35 @@ impl VM {
     }
 
     fn define_native_functions(&mut self) {
-        self.define_native_func("input", Some(0), native::io::input, SquatType::String);
-        self.define_native_func("print", None, native::io::print, SquatType::Nil);
-        self.define_native_func("println", None, native::io::println, SquatType::Nil);
+        self.define_native_func("input", native::io::input, SquatFunctionTypeData::new(vec![], SquatType::String));
+        self.define_native_func("print", native::io::print, SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::Nil));
+        self.define_native_func("println", native::io::println, SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::Nil));
 
-        self.define_native_func("cbrt", Some(1), native::number::cbrt, SquatType::Float);
-        self.define_native_func("sqrt", Some(1), native::number::sqrt, SquatType::Float);
-        self.define_native_func("pow", Some(2), native::number::pow, SquatType::Float);
-        self.define_native_func("to_int", Some(1), native::number::to_int, SquatType::Int);
+        self.define_native_func("cbrt", native::number::cbrt, SquatFunctionTypeData::new(vec![SquatType::Number], SquatType::Float));
+        self.define_native_func("sqrt", native::number::sqrt, SquatFunctionTypeData::new(vec![SquatType::Number], SquatType::Float));
+        self.define_native_func("pow", native::number::pow, SquatFunctionTypeData::new(vec![SquatType::Number, SquatType::Number], SquatType::Float));
+        self.define_native_func("to_int", native::number::to_int, SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::Int));
+        self.define_native_func("to_float", native::number::to_float, SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::Float));
 
-        self.define_native_func("exit", Some(1), native::misc::exit, SquatType::Nil);
-        self.define_native_func("time", Some(0), native::misc::time, SquatType::Float);
-        self.define_native_func("type", Some(1), native::misc::get_type, SquatType::Type);
+        self.define_native_func("exit", native::misc::exit, SquatFunctionTypeData::new(vec![SquatType::Int], SquatType::Nil));
+        self.define_native_func("time", native::misc::time, SquatFunctionTypeData::new(vec![], SquatType::Float));
+        self.define_native_func("type", native::misc::get_type, SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::Type));
     }
 
     fn define_native_func(
         &mut self,
         name: &str,
-        arity: Option<usize>,
         func: native::NativeFunc,
-        _return_type: SquatType
+        func_data: SquatFunctionTypeData,
     ) {
-        let native_func = SquatNativeFunction::new(name, arity, func);
+        let native_func = SquatNativeFunction::new(name, func_data.arity, func);
         let native_object = SquatObject::NativeFunction(native_func);
         let native_value = SquatValue::Object(native_object);
-        self.natives.push(native_value);
+        
+        let native_compiler: CompilerNative = CompilerNative::new(
+            native_value,
+            SquatType::NativeFunction(func_data)
+        );
+        self.natives.push(native_compiler);
     }
 }

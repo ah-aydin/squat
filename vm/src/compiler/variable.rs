@@ -1,4 +1,4 @@
-use crate::value::squat_type::SquatType;
+use crate::value::{squat_type::SquatType, squat_value::SquatValue};
 
 #[derive(Debug)]
 pub struct CompilerLocal {
@@ -23,6 +23,29 @@ impl CompilerLocal {
 
     pub fn set_type(&mut self, squat_type: SquatType) {
         self.squat_type = Some(squat_type);
+    }
+}
+
+#[derive(Debug)]
+pub struct CompilerNative {
+    squat_value: SquatValue,
+    squat_type: SquatType
+}
+
+impl CompilerNative {
+    pub fn new(squat_value: SquatValue, squat_type: SquatType) -> CompilerNative {
+        CompilerNative {
+           squat_value,
+           squat_type
+        }
+    }
+
+    pub fn get_value(&self) -> SquatValue {
+        self.squat_value.clone()
+    }
+
+    pub fn get_type(&self) -> SquatType {
+        self.squat_type.clone()
     }
 }
 

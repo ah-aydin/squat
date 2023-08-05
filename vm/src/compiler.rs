@@ -1,4 +1,4 @@
-mod variable;
+pub mod variable;
 
 use std::collections::HashMap;
 
@@ -13,6 +13,8 @@ use crate::value::{
     ValueArray
 };
 use variable::{CompilerGlobal, CompilerLocal};
+
+use self::variable::CompilerNative;
 
 const INITIAL_LOCALS_VECTOR_SIZE: usize = 256;
 
@@ -71,7 +73,7 @@ pub struct Compiler<'a> {
     main_chunk: &'a mut Chunk,
 
     globals: HashMap<String, CompilerGlobal>,
-    natives: &'a Vec<SquatValue>,
+    natives: &'a Vec<CompilerNative>,
     classes: HashMap<String, SquatClassTypeData>,
     constants: &'a mut ValueArray,
 
@@ -92,7 +94,7 @@ impl<'a> Compiler<'a> {
         source: &'a String,
         main_chunk: &'a mut Chunk,
         constants: &'a mut ValueArray,
-        natives: &'a Vec<SquatValue>
+        natives: &'a Vec<CompilerNative>
     ) -> Compiler<'a> {
         Compiler {
             lexer: Lexer::new(source),
@@ -353,7 +355,6 @@ impl<'a> Compiler<'a> {
 
         if !is_main {
             arity = param_types.len();
-            println!("Patching {}", func_name);
             self.patch_function(
                 &func_name,
                 SquatFunctionTypeData::new(
@@ -557,10 +558,6 @@ impl<'a> Compiler<'a> {
     }
 
     fn patch_function(&mut self, name: &str, data: SquatFunctionTypeData) {
-        // if self.scope_depth > 0 {
-        //     self.locals.last_mut().unwrap().set_type(SquatType::Function(data));
-        //     return;
-        // }
         self.globals.get_mut(name).unwrap().set_type(SquatType::Function(data));
     }
 
@@ -811,19 +808,19 @@ impl<'a> Compiler<'a> {
                 self.write_op_code(OpCode::Call(arg_count));
                 data.get_return_type()
             },
-            SquatType::NativeFunction => {
-                // TODO this is temporary code for the native calls
+            SquatType::NativeFunction(data) => {
                 let mut arg_count = 0;
                 if !self.check_current(TokenType::RightParenthesis) {
                     while !self.check_current(TokenType::RightParenthesis) {
-                        self.expression();
+                        let expression_type = self.expression();
+                        self.check_types(Some(data.get_param_type(arg_count)), &expression_type);
                         arg_count += 1;
                         self.check_current(TokenType::Comma);
                     }
                 }
 
                 self.write_op_code(OpCode::Call(arg_count));
-                SquatType::Nil
+                data.get_return_type()
             }
             _ => unreachable!("call")
         }
@@ -941,10 +938,10 @@ impl<'a> Compiler<'a> {
         } else if let Some((index, t)) = self.resolve_native(&var_name) {
             set_op_code = OpCode::Nil; // Just to keep the compiler happy
             get_op_code = OpCode::GetNative(index);
-            if let SquatType::NativeFunction = t.clone() {
+            if let SquatType::NativeFunction(data) = t.clone() {
                 is_func = true;
                 func_data = t.clone();
-                variable_type = SquatType::Nil;
+                variable_type = data.get_return_type();
             } else {
                 variable_type = t;
             }
@@ -1105,11 +1102,12 @@ impl<'a> Compiler<'a> {
     }
 
     fn resolve_native(&mut self, name: &str) -> Option<(usize, SquatType)> {
-        if let Some(native) = self.natives.iter().position(|x| match x {
+        if let Some(native_index) = self.natives.iter().position(|x| match x.get_value() {
             SquatValue::Object(SquatObject::NativeFunction(func)) => func.name == name,
             _ => unreachable!()
         }) {
-            return Some((native, SquatType::NativeFunction));
+        let native_type: SquatType = self.natives.get(native_index).unwrap().get_type();
+            return Some((native_index, native_type));
         }
         None
     }
