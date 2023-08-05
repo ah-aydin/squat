@@ -2,28 +2,45 @@
 #[repr(u8)]
 pub enum OpCode {
     Constant(usize),
-    
-    False, Nil, True,
 
-    Add, Subtract, Multiply, Divide, Mod,
+    False,
+    Nil,
+    True,
 
-    Equal, NotEqual,
-    Greater, GreaterEqual,
-    Less, LessEqual,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Mod,
 
-    Not, Negate,
+    Equal,
+    NotEqual,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
+
+    Not,
+    Negate,
 
     Pop,
 
-    DefineGlobal(usize), GetGlobal(usize), SetGlobal(usize),
-    GetLocal(usize), SetLocal(usize),
+    DefineGlobal(usize),
+    GetGlobal(usize),
+    SetGlobal(usize),
+    GetLocal(usize),
+    SetLocal(usize),
     GetNative(usize),
 
-    JumpTo(usize), JumpIfFalse(usize), Jump(usize), JumpIfTrue(usize),
+    JumpTo(usize),
+    JumpIfFalse(usize),
+    Jump(usize),
+    JumpIfTrue(usize),
     Loop(usize),
 
     Call(usize),
     Return,
 
-    Start, Stop,
+    Start,
+    Stop,
 }

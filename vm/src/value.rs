@@ -1,20 +1,20 @@
 pub mod squat_type;
 pub mod squat_value;
 
-use squat_value::SquatValue;
 use crate::object::SquatObject;
+use squat_value::SquatValue;
 
 #[derive(Debug)]
 pub struct ValueArray {
     name: String,
-    values: Vec<SquatValue>
+    values: Vec<SquatValue>,
 }
 
 impl ValueArray {
     pub fn new(name: &str) -> ValueArray {
         ValueArray {
             name: String::from(name),
-            values: Vec::new()
+            values: Vec::new(),
         }
     }
 

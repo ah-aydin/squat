@@ -1,20 +1,15 @@
 use crate::{
     chunk::Chunk,
-    op_code::OpCode,
-    compiler::{
-        Compiler,
-        CompileStatus, variable::CompilerNative
-    },
-    value::{
-        squat_value::SquatValue,
-        ValueArray, squat_type::{SquatType, SquatFunctionTypeData}
-    },
+    compiler::{variable::CompilerNative, CompileStatus, Compiler},
     native,
+    object::{SquatNativeFunction, SquatObject},
+    op_code::OpCode,
     options::Options,
-    object::{
-        SquatObject,
-        SquatNativeFunction
-    }
+    value::{
+        squat_type::{SquatFunctionTypeData, SquatType},
+        squat_value::SquatValue,
+        ValueArray,
+    },
 };
 
 const INITIAL_STACK_SIZE: usize = 256;
@@ -24,13 +19,13 @@ const INITIAL_CALL_STACK_SIZE: usize = 256;
 pub enum InterpretResult {
     InterpretOk(i64),
     InterpretCompileError,
-    InterpretRuntimeError
+    InterpretRuntimeError,
 }
 
 struct CallFrame {
     stack_index: usize,
     return_address: usize,
-    func_name: String
+    func_name: String,
 }
 
 impl CallFrame {
@@ -38,7 +33,7 @@ impl CallFrame {
         CallFrame {
             stack_index,
             return_address,
-            func_name
+            func_name,
         }
     }
 }
@@ -51,7 +46,7 @@ pub struct VM {
     constants: ValueArray,
     current_chunk: usize,
     chunks: Vec<Chunk>,
-    had_error: bool
+    had_error: bool,
 }
 
 impl VM {
@@ -64,7 +59,7 @@ impl VM {
             constants: ValueArray::new("Constants"),
             current_chunk: 0,
             chunks: vec![Chunk::new("Main", true)],
-            had_error: false
+            had_error: false,
         }
     }
 
@@ -74,7 +69,7 @@ impl VM {
             &source,
             &mut self.chunks[0],
             &mut self.constants,
-            &self.natives
+            &self.natives,
         );
         let compile_status = compiler.compile();
 
@@ -88,17 +83,15 @@ impl VM {
         let interpret_result = match compile_status {
             CompileStatus::Success(global_count) => {
                 self.globals = vec![None; global_count];
-                self.call_stack.push(
-                    CallFrame::new(
-                        0,
-                        self.chunks[0].get_main_start(),
-                        "main".to_owned()
-                    )
-                );
+                self.call_stack.push(CallFrame::new(
+                    0,
+                    self.chunks[0].get_main_start(),
+                    "main".to_owned(),
+                ));
 
                 self.interpret_chunk(0, opts)
-            },
-            CompileStatus::Fail => InterpretResult::InterpretCompileError
+            }
+            CompileStatus::Fail => InterpretResult::InterpretCompileError,
         };
 
         self.chunks[self.current_chunk].clear_instructions();
@@ -138,24 +131,23 @@ impl VM {
                         let index = *index;
                         let constant: &SquatValue = self.constants.get(index);
                         self.stack.push(constant.clone());
-                    },
+                    }
 
-                    OpCode::False           => self.stack.push(SquatValue::Bool(false)),
-                    OpCode::Nil             => self.stack.push(SquatValue::Nil),
-                    OpCode::True            => self.stack.push(SquatValue::Bool(true)),
+                    OpCode::False => self.stack.push(SquatValue::Bool(false)),
+                    OpCode::Nil => self.stack.push(SquatValue::Nil),
+                    OpCode::True => self.stack.push(SquatValue::Bool(true)),
 
-                    OpCode::Add             => self.binary_op(|left, right| left + right),
-                    OpCode::Subtract        => self.binary_op(|left, right| left - right),
-                    OpCode::Multiply        => self.binary_op(|left, right| left * right),
-                    OpCode::Divide          => self.binary_op(|left, right| left / right),
-                    // Just to compile for now
-                    OpCode::Mod             => self.binary_op(|left, right| left - right),
-                    OpCode::Equal           => self.binary_cmp(|left, right| left == right),
-                    OpCode::NotEqual        => self.binary_cmp(|left, right| left != right),
-                    OpCode::Greater         => self.binary_cmp(|left, right| left > right),
-                    OpCode::GreaterEqual    => self.binary_cmp(|left, right| left >= right),
-                    OpCode::Less            => self.binary_cmp(|left, right| left < right),
-                    OpCode::LessEqual       => self.binary_cmp(|left, right| left <= right),
+                    OpCode::Add => self.binary_op(|left, right| left + right),
+                    OpCode::Subtract => self.binary_op(|left, right| left - right),
+                    OpCode::Multiply => self.binary_op(|left, right| left * right),
+                    OpCode::Divide => self.binary_op(|left, right| left / right),
+                    OpCode::Mod => self.binary_op(|left, right| left % right),
+                    OpCode::Equal => self.binary_cmp(|left, right| left == right),
+                    OpCode::NotEqual => self.binary_cmp(|left, right| left != right),
+                    OpCode::Greater => self.binary_cmp(|left, right| left > right),
+                    OpCode::GreaterEqual => self.binary_cmp(|left, right| left >= right),
+                    OpCode::Less => self.binary_cmp(|left, right| left < right),
+                    OpCode::LessEqual => self.binary_cmp(|left, right| left <= right),
 
                     OpCode::Not => {
                         if let Some(value) = self.stack.pop() {
@@ -164,21 +156,19 @@ impl VM {
                             panic!("'!' cannot be used alone");
                         }
                     }
-                    OpCode::Negate => {
-                        match self.stack.pop() {
-                            Some(SquatValue::Float(value)) => {
-                                self.stack.push(SquatValue::Float(-value));
-                            },
-                            Some(SquatValue::Int(value)) => {
-                                self.stack.push(SquatValue::Int(-value));
-                            },
-                            _ => unreachable!("Negate requires a number value")
+                    OpCode::Negate => match self.stack.pop() {
+                        Some(SquatValue::Float(value)) => {
+                            self.stack.push(SquatValue::Float(-value));
                         }
+                        Some(SquatValue::Int(value)) => {
+                            self.stack.push(SquatValue::Int(-value));
+                        }
+                        _ => unreachable!("Negate requires a number value"),
                     },
 
                     OpCode::Pop => {
                         self.stack.pop();
-                    },
+                    }
 
                     OpCode::DefineGlobal(index) => {
                         let index = *index;
@@ -187,36 +177,37 @@ impl VM {
                         } else {
                             panic!("DefineGlobal OpCode expects a value to be on the stack");
                         }
-                    },
+                    }
                     OpCode::GetGlobal(index) => {
                         let index = *index;
                         if let Some(Some(value)) = self.globals.get(index) {
                             self.stack.push(value.clone());
                         } else {
-                            self.runtime_error(
-                                &format!("Variable with index {} is not defined", index)
-                            );
+                            self.runtime_error(&format!(
+                                "Variable with index {} is not defined",
+                                index
+                            ));
                         }
-                    },
+                    }
                     OpCode::SetGlobal(index) => {
                         let index = *index;
                         if let Some(value) = self.stack.last() {
                             if let Some(Some(_value)) = self.globals.get(index) {
                                 self.globals[index] = Some(value.clone());
                             } else {
-                                self.runtime_error(
-                                    &format!("You cannot set a global variable before defining it")
-                                );
+                                self.runtime_error(&format!(
+                                    "You cannot set a global variable before defining it"
+                                ));
                             }
                         } else {
                             panic!("SetGlobal OpCode expects a value to be on the stack");
                         }
-                    },
+                    }
 
                     OpCode::GetLocal(index) => {
                         let index = index + self.call_stack.last().unwrap().stack_index;
                         self.stack.push(self.stack[index].clone());
-                    },
+                    }
                     OpCode::SetLocal(index) => {
                         if let Some(value) = self.stack.last() {
                             let index = index + self.call_stack.last().unwrap().stack_index;
@@ -224,11 +215,11 @@ impl VM {
                         } else {
                             panic!("SetLocal OpCode expects a value to be on the stack");
                         }
-                    },
+                    }
 
                     OpCode::GetNative(index) => {
                         self.stack.push(self.natives[*index].get_value().clone());
-                    },
+                    }
 
                     OpCode::JumpTo(instruction_number) => {
                         self.chunks[self.current_chunk].current_instruction = *instruction_number;
@@ -241,10 +232,10 @@ impl VM {
                         } else {
                             panic!("JumpIfFalse OpCode expect a value to be on the stack");
                         }
-                    },
+                    }
                     OpCode::Jump(offset) => {
                         self.chunks[self.current_chunk].current_instruction += *offset;
-                    },
+                    }
                     OpCode::JumpIfTrue(offset) => {
                         if let Some(value) = self.stack.last() {
                             if value.is_truthy() {
@@ -253,10 +244,10 @@ impl VM {
                         } else {
                             panic!("JumpIfTrue OpCode expect a value to be on the stack");
                         }
-                    },
+                    }
                     OpCode::Loop(loop_start) => {
                         self.chunks[self.current_chunk].current_instruction = *loop_start;
-                    },
+                    }
 
                     OpCode::Call(arg_count) => {
                         let arg_count = *arg_count;
@@ -266,38 +257,32 @@ impl VM {
                         let native = match self.stack.get(func_data_location).unwrap() {
                             SquatValue::Object(SquatObject::Function(func_data)) => {
                                 if arg_count != func_data.arity {
-                                    self.runtime_error(
-                                        &format!(
-                                            "Function takes {} arguments but {} were given",
-                                            func_data.arity,
-                                            arg_count
-                                            )
-                                        );
+                                    self.runtime_error(&format!(
+                                        "Function takes {} arguments but {} were given",
+                                        func_data.arity, arg_count
+                                    ));
                                     return InterpretResult::InterpretRuntimeError;
                                 }
-                                let return_address = self.chunks[self.current_chunk].current_instruction;
-                                self.call_stack.push(
-                                    CallFrame::new(
-                                        self.stack.len() - arg_count,
-                                        return_address,
-                                        func_data.name.clone()
-                                        )
-                                    );
-                                self.chunks[self.current_chunk].current_instruction = func_data.start_instruction_index;
+                                let return_address =
+                                    self.chunks[self.current_chunk].current_instruction;
+                                self.call_stack.push(CallFrame::new(
+                                    self.stack.len() - arg_count,
+                                    return_address,
+                                    func_data.name.clone(),
+                                ));
+                                self.chunks[self.current_chunk].current_instruction =
+                                    func_data.start_instruction_index;
                                 continue;
-                            },
+                            }
                             SquatValue::Object(SquatObject::NativeFunction(func)) => func.clone(),
-                            _ => panic!("Call OpCode expects a FunctionObject on the stack")
+                            _ => panic!("Call OpCode expects a FunctionObject on the stack"),
                         };
 
                         if arg_count != native.arity {
-                            self.runtime_error(
-                                &format!(
-                                    "Function takes {} arguments but {} were given",
-                                    native.arity,
-                                    arg_count
-                                    )
-                                );
+                            self.runtime_error(&format!(
+                                "Function takes {} arguments but {} were given",
+                                native.arity, arg_count
+                            ));
                             return InterpretResult::InterpretRuntimeError;
                         }
 
@@ -309,9 +294,9 @@ impl VM {
                         args.reverse();
                         match native.call(args) {
                             Ok(value) => self.stack.push(value),
-                            Err(msg) => self.runtime_error(&msg)
+                            Err(msg) => self.runtime_error(&msg),
                         };
-                    },
+                    }
                     OpCode::Return => {
                         let return_val = self.stack.pop().unwrap();
                         if let Some(call_frame) = self.call_stack.pop() {
@@ -319,7 +304,8 @@ impl VM {
                                 self.stack.pop(); // Pop local variables
                             }
                             self.stack.pop(); // Pop SquatFunc
-                            self.chunks[self.current_chunk].current_instruction = call_frame.return_address;
+                            self.chunks[self.current_chunk].current_instruction =
+                                call_frame.return_address;
                             self.stack.push(return_val);
                         } else {
                             if let SquatValue::Int(i) = return_val {
@@ -327,9 +313,9 @@ impl VM {
                             }
                             return InterpretResult::InterpretOk(0);
                         }
-                    },
+                    }
 
-                    OpCode::Start => {},
+                    OpCode::Start => {}
                     OpCode::Stop => {
                         return InterpretResult::InterpretOk(0);
                     }
@@ -343,7 +329,9 @@ impl VM {
     }
 
     fn binary_op<F>(&mut self, op: F)
-    where F: FnOnce(SquatValue, SquatValue) -> SquatValue {
+    where
+        F: FnOnce(SquatValue, SquatValue) -> SquatValue,
+    {
         let right = self.stack.pop();
         let left = self.stack.pop();
 
@@ -355,12 +343,15 @@ impl VM {
     }
 
     fn binary_cmp<F>(&mut self, op: F)
-    where F: FnOnce(SquatValue, SquatValue) -> bool {
+    where
+        F: FnOnce(SquatValue, SquatValue) -> bool,
+    {
         let right = self.stack.pop();
         let left = self.stack.pop();
 
         if left.is_some() && right.is_some() {
-            self.stack.push(SquatValue::Bool(op(left.unwrap(), right.unwrap())));
+            self.stack
+                .push(SquatValue::Bool(op(left.unwrap(), right.unwrap())));
         } else {
             unreachable!("Binary comparisons require 2 values in the stack");
         }
@@ -384,19 +375,66 @@ impl VM {
     }
 
     fn define_native_functions(&mut self) {
-        self.define_native_func("input", native::io::input, SquatFunctionTypeData::new(vec![], SquatType::String));
-        self.define_native_func("print", native::io::print, SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::Nil));
-        self.define_native_func("println", native::io::println, SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::Nil));
+        self.define_native_func(
+            "input",
+            native::io::input,
+            SquatFunctionTypeData::new(vec![], SquatType::String),
+        );
+        self.define_native_func(
+            "print",
+            native::io::print,
+            SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::Nil),
+        );
+        self.define_native_func(
+            "println",
+            native::io::println,
+            SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::Nil),
+        );
 
-        self.define_native_func("cbrt", native::number::cbrt, SquatFunctionTypeData::new(vec![SquatType::Number], SquatType::Float));
-        self.define_native_func("sqrt", native::number::sqrt, SquatFunctionTypeData::new(vec![SquatType::Number], SquatType::Float));
-        self.define_native_func("pow", native::number::pow, SquatFunctionTypeData::new(vec![SquatType::Number, SquatType::Number], SquatType::Float));
-        self.define_native_func("to_int", native::number::to_int, SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::Int));
-        self.define_native_func("to_float", native::number::to_float, SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::Float));
+        self.define_native_func(
+            "cbrt",
+            native::number::cbrt,
+            SquatFunctionTypeData::new(vec![SquatType::Number], SquatType::Float),
+        );
+        self.define_native_func(
+            "sqrt",
+            native::number::sqrt,
+            SquatFunctionTypeData::new(vec![SquatType::Number], SquatType::Float),
+        );
+        self.define_native_func(
+            "pow",
+            native::number::pow,
+            SquatFunctionTypeData::new(
+                vec![SquatType::Number, SquatType::Number],
+                SquatType::Float,
+            ),
+        );
+        self.define_native_func(
+            "to_int",
+            native::number::to_int,
+            SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::Int),
+        );
+        self.define_native_func(
+            "to_float",
+            native::number::to_float,
+            SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::Float),
+        );
 
-        self.define_native_func("exit", native::misc::exit, SquatFunctionTypeData::new(vec![SquatType::Int], SquatType::Nil));
-        self.define_native_func("time", native::misc::time, SquatFunctionTypeData::new(vec![], SquatType::Float));
-        self.define_native_func("type", native::misc::get_type, SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::Type));
+        self.define_native_func(
+            "exit",
+            native::misc::exit,
+            SquatFunctionTypeData::new(vec![SquatType::Int], SquatType::Nil),
+        );
+        self.define_native_func(
+            "time",
+            native::misc::time,
+            SquatFunctionTypeData::new(vec![], SquatType::Float),
+        );
+        self.define_native_func(
+            "type",
+            native::misc::get_type,
+            SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::Type),
+        );
     }
 
     fn define_native_func(
@@ -408,11 +446,9 @@ impl VM {
         let native_func = SquatNativeFunction::new(name, func_data.arity, func);
         let native_object = SquatObject::NativeFunction(native_func);
         let native_value = SquatValue::Object(native_object);
-        
-        let native_compiler: CompilerNative = CompilerNative::new(
-            native_value,
-            SquatType::NativeFunction(func_data)
-        );
+
+        let native_compiler: CompilerNative =
+            CompilerNative::new(native_value, SquatType::NativeFunction(func_data));
         self.natives.push(native_compiler);
     }
 }

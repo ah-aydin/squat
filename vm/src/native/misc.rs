@@ -13,7 +13,10 @@ pub fn exit(args: NativeFuncArgs) -> NativeFuncReturnType {
 
 pub fn time(_args: NativeFuncArgs) -> NativeFuncReturnType {
     let now = SystemTime::now();
-    let value = now.duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs_f64();
+    let value = now
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs_f64();
     Ok(SquatValue::Float(value))
 }
 

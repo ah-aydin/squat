@@ -3,7 +3,7 @@ extern crate proc_macro;
 use std::collections::BTreeMap;
 
 use proc_macro::TokenStream;
-use quote::{quote, format_ident};
+use quote::{format_ident, quote};
 use syn::{self, DeriveInput, Type};
 
 #[derive(deluxe::ExtractAttributes, Debug)]
@@ -33,7 +33,7 @@ struct ArgData {
     long: Option<String>,
     description: Option<String>,
     required: bool,
-    has_parameter: bool
+    has_parameter: bool,
 }
 
 impl ArgData {
@@ -42,14 +42,14 @@ impl ArgData {
             short: attrs.short,
             long: match attrs.long.len() {
                 0 => None,
-                _ => Some(attrs.long)
+                _ => Some(attrs.long),
             },
             description: match attrs.description.len() {
                 0 => None,
-                _ => Some(attrs.description)
+                _ => Some(attrs.description),
             },
             required: attrs.required,
-            has_parameter 
+            has_parameter,
         }
     }
 }
@@ -72,7 +72,10 @@ fn extract_arg_field_attrs(ast: &mut DeriveInput) -> deluxe::Result<BTreeMap<Str
         for field in s.fields.iter_mut() {
             let field_name = field.ident.as_ref().unwrap().to_string();
             let attrs: ArgDefinition = deluxe::extract_attributes(field)?;
-            field_attrs.insert(field_name, ArgData::from_arg_attribs(attrs, !is_bool(&field.ty)));
+            field_attrs.insert(
+                field_name,
+                ArgData::from_arg_attribs(attrs, !is_bool(&field.ty)),
+            );
         }
     } else {
         panic!("Only structs are supported");
@@ -81,7 +84,12 @@ fn extract_arg_field_attrs(ast: &mut DeriveInput) -> deluxe::Result<BTreeMap<Str
     Ok(field_attrs)
 }
 
-fn build_match_arms(index: usize, value: &str, field_name: &String, has_parameter: bool) -> proc_macro2::TokenStream {
+fn build_match_arms(
+    index: usize,
+    value: &str,
+    field_name: &String,
+    has_parameter: bool,
+) -> proc_macro2::TokenStream {
     let value_str = syn::LitStr::new(value, proc_macro2::Span::call_site());
     let field_name = format_ident!("{}", field_name);
     let set_struct_field = match has_parameter {
@@ -96,7 +104,7 @@ fn build_match_arms(index: usize, value: &str, field_name: &String, has_paramete
         },
         false => quote! {
             return_struct.#field_name = true;
-        }
+        },
     };
     quote! {
         #value_str => {
@@ -111,7 +119,9 @@ fn build_match_arms(index: usize, value: &str, field_name: &String, has_paramete
     }
 }
 
-fn parse_cmd_args_derive2(item: proc_macro2::TokenStream) -> deluxe::Result<proc_macro2::TokenStream> {
+fn parse_cmd_args_derive2(
+    item: proc_macro2::TokenStream,
+) -> deluxe::Result<proc_macro2::TokenStream> {
     // parse
     let mut ast: DeriveInput = syn::parse2(item)?;
     let meta_data: MetaDataDefinition = deluxe::extract_attributes(&mut ast)?;
@@ -121,7 +131,7 @@ fn parse_cmd_args_derive2(item: proc_macro2::TokenStream) -> deluxe::Result<proc
 
     // Destructure the map and build debug strings
     let mut field_names = Vec::new();
-    let mut short_commands= Vec::new();
+    let mut short_commands = Vec::new();
     let mut long_commands = Vec::new();
     let mut required = Vec::new();
     let mut has_parameter = Vec::new();
@@ -165,13 +175,19 @@ fn parse_cmd_args_derive2(item: proc_macro2::TokenStream) -> deluxe::Result<proc
         } else {
             parameter = "".to_owned();
         }
-        options_str += &format!("   {:03} {:20} {:20} {}", short, long, parameter, description);
+        options_str += &format!(
+            "   {:03} {:20} {:20} {}",
+            short, long, parameter, description
+        );
         if req {
             options_str += " (Required)";
         }
         options_str += "\n";
     }
-    options_str += &format!("   {:03} {:20} {:20} {}", "-h", "--help", "", "Displays help");
+    options_str += &format!(
+        "   {:03} {:20} {:20} {}",
+        "-h", "--help", "", "Displays help"
+    );
 
     if meta_data.description.len() > 0 {
         usage_str += &format!("\n\n{}", &meta_data.description);
@@ -182,7 +198,7 @@ fn parse_cmd_args_derive2(item: proc_macro2::TokenStream) -> deluxe::Result<proc
     let ident = &ast.ident;
     let (impl_generics, type_generics, where_clause) = ast.generics.split_for_impl();
 
-    // Generate 
+    // Generate
     let match_arms_short_commands = short_commands.iter().enumerate().map(|(index, value)| {
         build_match_arms(index, value, &field_names[index], has_parameter[index])
     });
@@ -243,7 +259,7 @@ fn parse_cmd_args_derive2(item: proc_macro2::TokenStream) -> deluxe::Result<proc
                     };
                     i += 1;
                 }
-                
+
                 for i in 0..#options_count {
                     if required[i] && !processed[i] {
                         error(&format!("[ERROR] not all required options have been provided."));

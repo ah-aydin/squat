@@ -9,16 +9,16 @@ mod token;
 mod value;
 mod vm;
 
-use std::fs;
 use options::Options;
-use vm::{VM, InterpretResult};
+use std::fs;
+use vm::{InterpretResult, VM};
 
 fn run_file(opts: &Options) -> Result<i64, i64> {
     let mut vm = VM::new();
 
     let source = match fs::read_to_string(&opts.file) {
         Ok(contents) => contents,
-        _ => panic!("Failed to read file '{}'", opts.file)
+        _ => panic!("Failed to read file '{}'", opts.file),
     };
     println!("Compiling and running file: {}", opts.file);
 

@@ -3,15 +3,12 @@ use crate::op_code::OpCode;
 #[derive(Debug, PartialEq)]
 struct Line {
     line: u32,
-    count: u32
+    count: u32,
 }
 
 impl Line {
     fn new(line: u32) -> Line {
-        Line {
-            line,
-            count: 1
-        }
+        Line { line, count: 1 }
     }
 
     fn increment(&mut self) {
@@ -25,7 +22,7 @@ pub struct Chunk {
     code: Vec<OpCode>,
     pub current_instruction: usize,
     lines: Vec<Line>,
-    is_main_chunk: bool
+    is_main_chunk: bool,
 }
 
 impl Chunk {
@@ -35,7 +32,7 @@ impl Chunk {
             code: Vec::new(),
             current_instruction: 0,
             lines: Vec::new(),
-            is_main_chunk
+            is_main_chunk,
         }
     }
 
@@ -73,7 +70,7 @@ impl Chunk {
         unreachable!()
     }
 
-    fn disassemble_instruction(&self, op_code: &OpCode, op_index: usize) -> usize  {
+    fn disassemble_instruction(&self, op_code: &OpCode, op_index: usize) -> usize {
         // If this lines panics, there is something wrong with the implementation
         let identifier = format!("{:08} {:08}", op_index, self.get_line(op_index).unwrap());
 
@@ -95,7 +92,7 @@ impl Chunk {
                 i += 1;
             }
         }
-        
+
         None
     }
 
@@ -107,7 +104,7 @@ impl Chunk {
             _ => unreachable!(
                 "Trying to modify instruction {:?} into a jump instruction",
                 self.code[location]
-            )
+            ),
         };
     }
 

@@ -1,6 +1,6 @@
-use std::fmt;
-use crate::object::SquatObject;
 use super::squat_type::SquatType;
+use crate::object::SquatObject;
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SquatValue {
@@ -10,7 +10,7 @@ pub enum SquatValue {
     String(String),
     Bool(bool),
     Object(SquatObject),
-    Type(SquatType)
+    Type(SquatType),
 }
 
 impl SquatValue {
@@ -18,7 +18,7 @@ impl SquatValue {
         match self {
             SquatValue::Bool(true) => true,
             SquatValue::Bool(false) | SquatValue::Nil => false,
-            _ => true
+            _ => true,
         }
     }
 
@@ -40,21 +40,14 @@ impl std::ops::Add<SquatValue> for SquatValue {
 
     fn add(self, rhs: SquatValue) -> Self::Output {
         match (self, rhs) {
-            (SquatValue::Int(i1), SquatValue::Int(i2))
-                => SquatValue::Int(i1 + i2),
-            (SquatValue::Float(f1), SquatValue::Float(f2))
-                => SquatValue::Float(f1 + f2),
-            (SquatValue::Int(i), SquatValue::Float(f))
-                => SquatValue::Float((i as f64) + f),
-            (SquatValue::Float(f), SquatValue::Int(i))
-                => SquatValue::Float(f + (i as f64)),
-            (SquatValue::String(s1), SquatValue::String(s2))
-                => SquatValue::String(s1 + &s2),
-            (SquatValue::String(s), value)
-                => SquatValue::String(s + &value.to_string()),
-            (value, SquatValue::String(s))
-                => SquatValue::String(value.to_string() + &s),
-            (value1, value2) => unreachable!("{} {}", value1, value2)
+            (SquatValue::Int(i1), SquatValue::Int(i2)) => SquatValue::Int(i1 + i2),
+            (SquatValue::Float(f1), SquatValue::Float(f2)) => SquatValue::Float(f1 + f2),
+            (SquatValue::Int(i), SquatValue::Float(f)) => SquatValue::Float((i as f64) + f),
+            (SquatValue::Float(f), SquatValue::Int(i)) => SquatValue::Float(f + (i as f64)),
+            (SquatValue::String(s1), SquatValue::String(s2)) => SquatValue::String(s1 + &s2),
+            (SquatValue::String(s), value) => SquatValue::String(s + &value.to_string()),
+            (value, SquatValue::String(s)) => SquatValue::String(value.to_string() + &s),
+            (value1, value2) => unreachable!("{} {}", value1, value2),
         }
     }
 }
@@ -64,15 +57,11 @@ impl std::ops::Sub<SquatValue> for SquatValue {
 
     fn sub(self, rhs: SquatValue) -> Self::Output {
         match (self, rhs) {
-            (SquatValue::Int(i1), SquatValue::Int(i2))
-                => SquatValue::Int(i1 - i2),
-            (SquatValue::Float(f1), SquatValue::Float(f2))
-                => SquatValue::Float(f1 - f2),
-            (SquatValue::Int(i), SquatValue::Float(f))
-                => SquatValue::Float((i as f64) - f),
-            (SquatValue::Float(f), SquatValue::Int(i))
-                => SquatValue::Float(f - (i as f64)),
-            _ => unreachable!()
+            (SquatValue::Int(i1), SquatValue::Int(i2)) => SquatValue::Int(i1 - i2),
+            (SquatValue::Float(f1), SquatValue::Float(f2)) => SquatValue::Float(f1 - f2),
+            (SquatValue::Int(i), SquatValue::Float(f)) => SquatValue::Float((i as f64) - f),
+            (SquatValue::Float(f), SquatValue::Int(i)) => SquatValue::Float(f - (i as f64)),
+            _ => unreachable!(),
         }
     }
 }
@@ -82,15 +71,11 @@ impl std::ops::Mul<SquatValue> for SquatValue {
 
     fn mul(self, rhs: SquatValue) -> Self::Output {
         match (self, rhs) {
-            (SquatValue::Int(i1), SquatValue::Int(i2))
-                => SquatValue::Int(i1 * i2),
-            (SquatValue::Float(f1), SquatValue::Float(f2))
-                => SquatValue::Float(f1 * f2),
-            (SquatValue::Int(i), SquatValue::Float(f))
-                => SquatValue::Float((i as f64) * f),
-            (SquatValue::Float(f), SquatValue::Int(i))
-                => SquatValue::Float(f * (i as f64)),
-            _ => unreachable!()
+            (SquatValue::Int(i1), SquatValue::Int(i2)) => SquatValue::Int(i1 * i2),
+            (SquatValue::Float(f1), SquatValue::Float(f2)) => SquatValue::Float(f1 * f2),
+            (SquatValue::Int(i), SquatValue::Float(f)) => SquatValue::Float((i as f64) * f),
+            (SquatValue::Float(f), SquatValue::Int(i)) => SquatValue::Float(f * (i as f64)),
+            _ => unreachable!(),
         }
     }
 }
@@ -100,15 +85,25 @@ impl std::ops::Div<SquatValue> for SquatValue {
 
     fn div(self, rhs: SquatValue) -> Self::Output {
         match (self, rhs) {
-            (SquatValue::Int(i1), SquatValue::Int(i2))
-                => SquatValue::Int(i1 / i2),
-            (SquatValue::Float(f1), SquatValue::Float(f2))
-                => SquatValue::Float(f1 / f2),
-            (SquatValue::Int(i), SquatValue::Float(f))
-                => SquatValue::Float((i as f64) / f),
-            (SquatValue::Float(f), SquatValue::Int(i))
-                => SquatValue::Float(f / (i as f64)),
-            _ => unreachable!()
+            (SquatValue::Int(i1), SquatValue::Int(i2)) => SquatValue::Int(i1 / i2),
+            (SquatValue::Float(f1), SquatValue::Float(f2)) => SquatValue::Float(f1 / f2),
+            (SquatValue::Int(i), SquatValue::Float(f)) => SquatValue::Float((i as f64) / f),
+            (SquatValue::Float(f), SquatValue::Int(i)) => SquatValue::Float(f / (i as f64)),
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl std::ops::Rem<SquatValue> for SquatValue {
+    type Output = SquatValue;
+
+    fn rem(self, rhs: SquatValue) -> Self::Output {
+        match (self, rhs) {
+            (SquatValue::Int(i1), SquatValue::Int(i2)) => SquatValue::Int(i1 % i2),
+            (SquatValue::Float(f1), SquatValue::Float(f2)) => SquatValue::Float(f1 % f2),
+            (SquatValue::Int(i), SquatValue::Float(f)) => SquatValue::Float((i as f64) % f),
+            (SquatValue::Float(f), SquatValue::Int(i)) => SquatValue::Float(f % (i as f64)),
+            _ => unreachable!(),
         }
     }
 }
@@ -120,7 +115,7 @@ impl PartialOrd for SquatValue {
             (SquatValue::Int(i1), SquatValue::Int(i2)) => i1.partial_cmp(i2),
             (SquatValue::Float(f1), SquatValue::Float(f2)) => f1.partial_cmp(f2),
             (SquatValue::String(s1), SquatValue::String(s2)) => s1.partial_cmp(s2),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -128,13 +123,13 @@ impl PartialOrd for SquatValue {
 impl fmt::Display for SquatValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SquatValue::Nil             => write!(f, "Nil"),
-            SquatValue::Int(value)      => write!(f, "{}", value),
-            SquatValue::Float(value)    => write!(f, "{}", value),
-            SquatValue::Bool(value)     => write!(f, "{}", value),
-            SquatValue::String(value)   => write!(f, "{}", value),
-            SquatValue::Object(object)  => write!(f, "{}", object.to_string()),
-            SquatValue::Type(t)         => write!(f, "{}", t.to_string()),
+            SquatValue::Nil => write!(f, "Nil"),
+            SquatValue::Int(value) => write!(f, "{}", value),
+            SquatValue::Float(value) => write!(f, "{}", value),
+            SquatValue::Bool(value) => write!(f, "{}", value),
+            SquatValue::String(value) => write!(f, "{}", value),
+            SquatValue::Object(object) => write!(f, "{}", object.to_string()),
+            SquatValue::Type(t) => write!(f, "{}", t.to_string()),
         }
     }
 }
@@ -146,8 +141,7 @@ impl Default for SquatValue {
 }
 
 #[cfg(test)]
-mod test
-{
+mod test {
     use super::*;
 
     #[test]
@@ -215,13 +209,22 @@ mod test
         let v1 = SquatValue::String("string".to_string());
 
         let v2 = SquatValue::Int(10);
-        assert_eq!(v1.clone() + v2.clone(), SquatValue::String("string10".to_string()));
+        assert_eq!(
+            v1.clone() + v2.clone(),
+            SquatValue::String("string10".to_string())
+        );
 
         let v2 = SquatValue::Float(10.2);
-        assert_eq!(v1.clone() + v2.clone(), SquatValue::String("string10.2".to_string()));
+        assert_eq!(
+            v1.clone() + v2.clone(),
+            SquatValue::String("string10.2".to_string())
+        );
 
         let v2 = SquatValue::Bool(false);
-        assert_eq!(v1.clone() + v2.clone(), SquatValue::String("stringfalse".to_string()));
+        assert_eq!(
+            v1.clone() + v2.clone(),
+            SquatValue::String("stringfalse".to_string())
+        );
     }
 
     #[test]
@@ -229,12 +232,21 @@ mod test
         let v1 = SquatValue::String("string".to_string());
 
         let v2 = SquatValue::Int(10);
-        assert_eq!(v2.clone() + v1.clone(), SquatValue::String("10string".to_string()));
+        assert_eq!(
+            v2.clone() + v1.clone(),
+            SquatValue::String("10string".to_string())
+        );
 
         let v2 = SquatValue::Float(10.2);
-        assert_eq!(v2.clone() + v1.clone(), SquatValue::String("10.2string".to_string()));
+        assert_eq!(
+            v2.clone() + v1.clone(),
+            SquatValue::String("10.2string".to_string())
+        );
 
         let v2 = SquatValue::Bool(false);
-        assert_eq!(v2.clone() + v1.clone(), SquatValue::String("falsestring".to_string()));
+        assert_eq!(
+            v2.clone() + v1.clone(),
+            SquatValue::String("falsestring".to_string())
+        );
     }
 }

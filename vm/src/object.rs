@@ -1,8 +1,7 @@
-use crate::{native::{
-    NativeFunc,
-    NativeFuncArgs,
-    NativeFuncReturnType
-}, value::squat_type::SquatType};
+use crate::{
+    native::{NativeFunc, NativeFuncArgs, NativeFuncReturnType},
+    value::squat_type::SquatType,
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct SquatClass {
@@ -20,7 +19,7 @@ impl SquatClass {
 pub struct SquatFunction {
     pub name: String,
     pub start_instruction_index: usize,
-    pub arity: usize
+    pub arity: usize,
 }
 
 impl SquatFunction {
@@ -28,7 +27,7 @@ impl SquatFunction {
         SquatFunction {
             name: name.to_owned(),
             start_instruction_index,
-            arity
+            arity,
         }
     }
 }
@@ -37,12 +36,16 @@ impl SquatFunction {
 pub struct SquatNativeFunction {
     pub name: String,
     pub arity: usize,
-    function: NativeFunc
+    function: NativeFunc,
 }
 
 impl SquatNativeFunction {
     pub fn new(name: &str, arity: usize, function: NativeFunc) -> SquatNativeFunction {
-        SquatNativeFunction { name: name.to_string(), arity , function }
+        SquatNativeFunction {
+            name: name.to_string(),
+            arity,
+            function,
+        }
     }
 
     pub fn call(&self, args: NativeFuncArgs) -> NativeFuncReturnType {
@@ -80,19 +83,14 @@ impl ToString for SquatObject {
 impl PartialEq for SquatObject {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (
-                SquatObject::Function(func1), 
-                SquatObject::Function(func2)
-            ) => func1.start_instruction_index == func2.start_instruction_index,
-            (
-                SquatObject::NativeFunction(func1),
-                SquatObject::NativeFunction(func2)
-            ) => func1.name == func2.name,
-            (
-                SquatObject::Class(class1),
-                SquatObject::Class(class2),
-            ) => class1.name == class2.name,
-            _ => false
+            (SquatObject::Function(func1), SquatObject::Function(func2)) => {
+                func1.start_instruction_index == func2.start_instruction_index
+            }
+            (SquatObject::NativeFunction(func1), SquatObject::NativeFunction(func2)) => {
+                func1.name == func2.name
+            }
+            (SquatObject::Class(class1), SquatObject::Class(class2)) => class1.name == class2.name,
+            _ => false,
         }
     }
 }

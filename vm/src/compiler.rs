@@ -4,14 +4,11 @@ use std::collections::HashMap;
 
 use crate::chunk::Chunk;
 use crate::lexer::{Lexer, LexerError};
-use crate::object::{SquatObject, SquatFunction, SquatClass};
+use crate::object::{SquatClass, SquatFunction, SquatObject};
 use crate::op_code::OpCode;
-use crate::token::{TokenType, Token};
-use crate::value::squat_type::{SquatType, SquatFunctionTypeData, SquatClassTypeData};
-use crate::value::{
-    squat_value::SquatValue,
-    ValueArray
-};
+use crate::token::{Token, TokenType};
+use crate::value::squat_type::{SquatClassTypeData, SquatFunctionTypeData, SquatType};
+use crate::value::{squat_value::SquatValue, ValueArray};
 use variable::{CompilerGlobal, CompilerLocal};
 
 use self::variable::CompilerNative;
@@ -32,7 +29,7 @@ enum Precedence {
     Factor,
     Unary,
     Call,
-    Primary
+    Primary,
 }
 
 impl std::ops::Add<u8> for Precedence {
@@ -55,14 +52,14 @@ impl std::ops::Add<u8> for Precedence {
 /// ```
 pub enum CompileStatus {
     Success(usize),
-    Fail
+    Fail,
 }
 
 #[derive(Clone, Copy)]
 enum ScopeType {
     Global,
     Class,
-    Function
+    Function,
 }
 
 pub struct Compiler<'a> {
@@ -94,13 +91,13 @@ impl<'a> Compiler<'a> {
         source: &'a String,
         main_chunk: &'a mut Chunk,
         constants: &'a mut ValueArray,
-        natives: &'a Vec<CompilerNative>
+        natives: &'a Vec<CompilerNative>,
     ) -> Compiler<'a> {
         Compiler {
             lexer: Lexer::new(source),
             previous_token: None,
             current_token: None,
-            
+
             main_chunk,
 
             globals: HashMap::new(),
@@ -167,8 +164,16 @@ impl<'a> Compiler<'a> {
         } else if self.check_current(TokenType::StringType) {
             self.var_declaration(Some(SquatType::String));
             return true;
-        } else if self.classes.get(&self.current_token.as_ref().unwrap().lexeme).is_some() {
-            let class_data = self.classes.get(&self.current_token.as_ref().unwrap().lexeme).unwrap().clone();
+        } else if self
+            .classes
+            .get(&self.current_token.as_ref().unwrap().lexeme)
+            .is_some()
+        {
+            let class_data = self
+                .classes
+                .get(&self.current_token.as_ref().unwrap().lexeme)
+                .unwrap()
+                .clone();
             self.advance();
             self.var_declaration(Some(SquatType::Class(class_data.clone())));
             return true;
@@ -179,16 +184,20 @@ impl<'a> Compiler<'a> {
     fn parse_function_type(&mut self) -> SquatType {
         let mut function_data: SquatFunctionTypeData = Default::default();
         if !self.check_current(TokenType::RightParenthesis) {
-            function_data.param_types.push(match self.get_parameter_type() {
-                Ok(value) => value,
-                Err(()) => return SquatType::Nil,
-            });
-
-            while self.check_current(TokenType::Comma) {
-                function_data.param_types.push(match self.get_parameter_type() {
+            function_data
+                .param_types
+                .push(match self.get_parameter_type() {
                     Ok(value) => value,
                     Err(()) => return SquatType::Nil,
                 });
+
+            while self.check_current(TokenType::Comma) {
+                function_data
+                    .param_types
+                    .push(match self.get_parameter_type() {
+                        Ok(value) => value,
+                        Err(()) => return SquatType::Nil,
+                    });
             }
         }
         self.consume_current(TokenType::RightParenthesis, "Expect closing ')'.");
@@ -217,7 +226,7 @@ impl<'a> Compiler<'a> {
                 match self.scope_type {
                     ScopeType::Global => self.function_declaration(),
                     ScopeType::Class => todo!("Implement class methods"),
-                    _ => self.compile_error("Cannot declare a function in local scope")
+                    _ => self.compile_error("Cannot declare a function in local scope"),
                 }
             }
         } else if self.try_var_declaration() {
@@ -229,7 +238,7 @@ impl<'a> Compiler<'a> {
         } else if self.check_current(TokenType::Class) {
             match self.scope_type {
                 ScopeType::Global => self.class_declaration(),
-                _ => self.compile_error("Cannot declare a class in local scope")
+                _ => self.compile_error("Cannot declare a class in local scope"),
             }
         } else {
             match self.scope_type {
@@ -257,6 +266,7 @@ impl<'a> Compiler<'a> {
         self.scope_type = ScopeType::Class;
 
         self.consume_current(TokenType::LeftBrace, "Expected '{' before class body");
+        // TODO include logic for the class body
         self.consume_current(TokenType::RightBrace, "Expected '}' after class body");
 
         self.patch_jump(jump);
@@ -264,9 +274,7 @@ impl<'a> Compiler<'a> {
 
         self.classes.insert(name.clone(), class_data);
 
-        let class_object = SquatObject::Class(
-            SquatClass::new(&name)
-        );
+        let class_object = SquatObject::Class(SquatClass::new(&name));
         let constant_index = self.constants.write(SquatValue::Object(class_object));
         self.write_op_code(OpCode::Constant(constant_index));
         self.define_object(index);
@@ -282,7 +290,10 @@ impl<'a> Compiler<'a> {
             }
         };
 
-        self.consume_current(TokenType::LeftParenthesis, "Expect '(' after function name.");
+        self.consume_current(
+            TokenType::LeftParenthesis,
+            "Expect '(' after function name.",
+        );
         let is_main: bool;
         let mut arity: usize = 0;
 
@@ -357,10 +368,7 @@ impl<'a> Compiler<'a> {
             arity = param_types.len();
             self.patch_function(
                 &func_name,
-                SquatFunctionTypeData::new(
-                    param_types,
-                    return_type.clone()
-                )
+                SquatFunctionTypeData::new(param_types, return_type.clone()),
             );
         }
 
@@ -375,9 +383,8 @@ impl<'a> Compiler<'a> {
 
         self.patch_jump(jump);
         if !is_main {
-            let function_obj = SquatObject::Function(
-                SquatFunction::new(&func_name, starting_index, arity)
-            );
+            let function_obj =
+                SquatObject::Function(SquatFunction::new(&func_name, starting_index, arity));
             let constant_index = self.constants.write(SquatValue::Object(function_obj));
             self.write_op_code(OpCode::Constant(constant_index));
             self.define_object(index);
@@ -400,65 +407,84 @@ impl<'a> Compiler<'a> {
             var_type = self.expression_with_type(squat_type);
         } else {
             if squat_type.is_none() {
-                self.compile_error(&format!("Cannot define variable using 'var' without giving it a value"));
+                self.compile_error(&format!(
+                    "Cannot define variable using 'var' without giving it a value"
+                ));
                 return;
             }
             let index = match squat_type.unwrap() {
                 SquatType::Int => {
                     var_type = SquatType::Int;
                     Some(self.constants.write(SquatValue::Int(0)))
-                },
+                }
                 SquatType::Float => {
                     var_type = SquatType::Float;
                     Some(self.constants.write(SquatValue::Float(0.)))
-                },
+                }
                 SquatType::String => {
                     var_type = SquatType::String;
                     Some(self.constants.write(SquatValue::String("".to_owned())))
-                },
+                }
                 SquatType::Bool => {
                     var_type = SquatType::Bool;
                     Some(self.constants.write(SquatValue::Bool(false)))
-                },
+                }
                 SquatType::Function(data) => {
                     var_type = SquatType::Function(data);
-                    Some(self.constants.write(SquatValue::Object(SquatObject::Function(Default::default()))))
-                },
+                    Some(
+                        self.constants
+                            .write(SquatValue::Object(
+                                SquatObject::Function(Default::default()),
+                            )),
+                    )
+                }
+                SquatType::NativeFunction(data) => {
+                    var_type = SquatType::NativeFunction(data);
+                    Some(
+                        self.constants
+                            .write(SquatValue::Object(
+                                SquatObject::Function(Default::default()),
+                            )),
+                    )
+                }
                 SquatType::Class(data) => {
                     var_type = SquatType::Class(data);
                     None
-                },
-                _ => unreachable!("var_declaration")
+                }
+                _ => unreachable!("var_declaration"),
             };
             match index {
                 Some(index) => self.write_op_code(OpCode::Constant(index)),
-                None => self.write_op_code(OpCode::Nil)
+                None => self.write_op_code(OpCode::Nil),
             };
         }
 
-        self.consume_current(TokenType::Semicolon, "Expect ';' after variable declaration.");
+        self.consume_current(
+            TokenType::Semicolon,
+            "Expect ';' after variable declaration.",
+        );
 
         self.define_variable(index, &name, var_type);
     }
 
     fn get_type(&mut self) -> Option<SquatType> {
         match self.current_token.as_ref().unwrap().token_type {
-            TokenType::BoolType=> {
+            TokenType::BoolType => {
                 self.advance();
                 Some(SquatType::Bool)
-            },
+            }
             TokenType::IntType => {
                 self.advance();
                 Some(SquatType::Int)
-            },
+            }
             TokenType::FloatType => {
                 self.advance();
                 Some(SquatType::Float)
-            },
+            }
             TokenType::StringType => {
                 self.advance();
                 Some(SquatType::String)
-            },
+            }
             TokenType::Func => {
                 self.advance();
                 if !self.check_current(TokenType::LeftParenthesis) {
@@ -468,7 +494,7 @@ impl<'a> Compiler<'a> {
                     Some(self.parse_function_type())
                 }
             }
-            _ => None
+            _ => None,
         }
     }
 
@@ -513,13 +539,10 @@ impl<'a> Compiler<'a> {
                 }
 
                 if self.locals[i].name == name {
-                    self.compile_error(
-                        &format!(
-                            "'{}' allready exists in this scope (depth: {})",
-                            name,
-                            &self.scope_depth
-                        )
-                    );
+                    self.compile_error(&format!(
+                        "'{}' allready exists in this scope (depth: {})",
+                        name, &self.scope_depth
+                    ));
                     return Err(());
                 }
             }
@@ -551,14 +574,23 @@ impl<'a> Compiler<'a> {
 
     fn patch_class(&mut self, name: &str, data: SquatClassTypeData) {
         if self.scope_depth > 0 {
-            self.locals.last_mut().unwrap().set_type(SquatType::Class(data));
+            self.locals
+                .last_mut()
+                .unwrap()
+                .set_type(SquatType::Class(data));
             return;
         }
-        self.globals.get_mut(name).unwrap().set_type(SquatType::Class(data));
+        self.globals
+            .get_mut(name)
+            .unwrap()
+            .set_type(SquatType::Class(data));
     }
 
     fn patch_function(&mut self, name: &str, data: SquatFunctionTypeData) {
-        self.globals.get_mut(name).unwrap().set_type(SquatType::Function(data));
+        self.globals
+            .get_mut(name)
+            .unwrap()
+            .set_type(SquatType::Function(data));
     }
 
     fn define_object(&mut self, index: usize) {
@@ -582,13 +614,10 @@ impl<'a> Compiler<'a> {
     fn return_statement(&mut self, _expected_return_type: SquatType) {
         let expression_type = self.expression();
         if self.function_return_type != expression_type {
-            self.compile_error(
-                &format!(
-                    "Function has return type '{}' but '{}' was given",
-                    self.function_return_type,
-                    expression_type
-                )
-            );
+            self.compile_error(&format!(
+                "Function has return type '{}' but '{}' was given",
+                self.function_return_type, expression_type
+            ));
         }
         self.consume_current(TokenType::Semicolon, "Expected ';' after return value");
         self.write_op_code(OpCode::Return);
@@ -644,7 +673,7 @@ impl<'a> Compiler<'a> {
         self.patch_jump(exit_jump);
         self.write_op_code(OpCode::Pop);
     }
-    
+
     fn for_statement(&mut self) {
         self.begin_scope();
 
@@ -705,20 +734,22 @@ impl<'a> Compiler<'a> {
     //////////////////////////////////////////////////////////////////////////
     /// Expression rules
     //////////////////////////////////////////////////////////////////////////
-    
-    fn parse_precedence(&mut self, precedence: Precedence, expected_type: Option<SquatType>) -> SquatType {
+
+    fn parse_precedence(
+        &mut self,
+        precedence: Precedence,
+        expected_type: Option<SquatType>,
+    ) -> SquatType {
         self.advance();
         let prefix_type = self.call_prefix(
             self.previous_token.as_ref().unwrap().token_type,
-            expected_type.clone()
+            expected_type.clone(),
         );
         if !self.check_types(expected_type.clone(), &prefix_type) {
             return expected_type.unwrap();
         }
 
-        while precedence <= self.get_precedence(
-            self.current_token.as_ref().unwrap().token_type
-        ) {
+        while precedence <= self.get_precedence(self.current_token.as_ref().unwrap().token_type) {
             self.advance();
 
             if self.check_previous(TokenType::Question) {
@@ -726,7 +757,7 @@ impl<'a> Compiler<'a> {
             }
             self.call_infix(
                 self.previous_token.as_ref().unwrap().token_type,
-                Some(prefix_type.clone())
+                Some(prefix_type.clone()),
             );
         }
 
@@ -773,20 +804,20 @@ impl<'a> Compiler<'a> {
         self.check_types(expected_type, &rhs_type);
 
         match token_type {
-            TokenType::Plus             => self.write_op_code(OpCode::Add),
-            TokenType::Minus            => self.write_op_code(OpCode::Subtract),
-            TokenType::Star             => self.write_op_code(OpCode::Multiply),
-            TokenType::Slash            => self.write_op_code(OpCode::Divide),
-            TokenType::Percent          => self.write_op_code(OpCode::Mod),
+            TokenType::Plus => self.write_op_code(OpCode::Add),
+            TokenType::Minus => self.write_op_code(OpCode::Subtract),
+            TokenType::Star => self.write_op_code(OpCode::Multiply),
+            TokenType::Slash => self.write_op_code(OpCode::Divide),
+            TokenType::Percent => self.write_op_code(OpCode::Mod),
 
-            TokenType::BangEqual        => self.write_op_code(OpCode::NotEqual),
-            TokenType::EqualEqual       => self.write_op_code(OpCode::Equal),
-            TokenType::Greater          => self.write_op_code(OpCode::Greater),
-            TokenType::GreaterEqual     => self.write_op_code(OpCode::GreaterEqual),
-            TokenType::Less             => self.write_op_code(OpCode::Less),
-            TokenType::LessEqual        => self.write_op_code(OpCode::LessEqual),
+            TokenType::BangEqual => self.write_op_code(OpCode::NotEqual),
+            TokenType::EqualEqual => self.write_op_code(OpCode::Equal),
+            TokenType::Greater => self.write_op_code(OpCode::Greater),
+            TokenType::GreaterEqual => self.write_op_code(OpCode::GreaterEqual),
+            TokenType::Less => self.write_op_code(OpCode::Less),
+            TokenType::LessEqual => self.write_op_code(OpCode::LessEqual),
 
-            _ => unreachable!()
+            _ => unreachable!(),
         }
 
         rhs_type
@@ -794,21 +825,7 @@ impl<'a> Compiler<'a> {
 
     fn call(&mut self, func_data: SquatType) -> SquatType {
         match func_data {
-            SquatType::Function(data) => {
-                let mut arg_count = 0;
-                if !self.check_current(TokenType::RightParenthesis) {
-                    while !self.check_current(TokenType::RightParenthesis) {
-                        let expression_type = self.expression();
-                        self.check_types(Some(data.get_param_type(arg_count)), &expression_type);
-                        arg_count += 1;
-                        self.check_current(TokenType::Comma);
-                    }
-                }
-
-                self.write_op_code(OpCode::Call(arg_count));
-                data.get_return_type()
-            },
-            SquatType::NativeFunction(data) => {
+            SquatType::Function(data) | SquatType::NativeFunction(data) => {
                 let mut arg_count = 0;
                 if !self.check_current(TokenType::RightParenthesis) {
                     while !self.check_current(TokenType::RightParenthesis) {
@@ -822,7 +839,7 @@ impl<'a> Compiler<'a> {
                 self.write_op_code(OpCode::Call(arg_count));
                 data.get_return_type()
             }
-            _ => unreachable!("call")
+            _ => unreachable!("call"),
         }
     }
 
@@ -847,16 +864,16 @@ impl<'a> Compiler<'a> {
             TokenType::False => {
                 self.write_op_code(OpCode::False);
                 SquatType::Bool
-            },
+            }
             TokenType::Nil => {
                 self.write_op_code(OpCode::Nil);
                 SquatType::Nil
-            },
+            }
             TokenType::True => {
                 self.write_op_code(OpCode::True);
                 SquatType::Bool
-            },
-            _ => unreachable!()
+            }
+            _ => unreachable!(),
         }
     }
 
@@ -896,14 +913,13 @@ impl<'a> Compiler<'a> {
             TokenType::Bang => {
                 self.write_op_code(OpCode::Not);
                 SquatType::Bool
-            },
+            }
             TokenType::Minus => {
                 self.write_op_code(OpCode::Negate);
                 expression_type
             }
-            _ => unreachable!()
+            _ => unreachable!(),
         }
-
     }
 
     fn variable(&mut self) -> SquatType {
@@ -945,28 +961,23 @@ impl<'a> Compiler<'a> {
             } else {
                 variable_type = t;
             }
-        }
-        else {
+        } else {
             self.compile_error(&format!("{} is not defined.", var_name));
             return SquatType::Nil;
         }
 
         if self.check_current(TokenType::Equal) {
             if is_func {
-                self.compile_error(
-                    &format!(
-                        "Cannot change assignment of function '{}",
-                        var_name
-                    )
-                );
-                return  SquatType::Nil;
+                self.compile_error(&format!(
+                    "Cannot change assignment of function '{}",
+                    var_name
+                ));
+                return SquatType::Nil;
             } else if let OpCode::GetNative(_) = get_op_code {
-                self.compile_error(
-                    &format!(
-                        "Cannot change assignment of native object '{}'",
-                        var_name
-                    )
-                );
+                self.compile_error(&format!(
+                    "Cannot change assignment of native object '{}'",
+                    var_name
+                ));
                 return SquatType::Nil;
             }
             self.expression_with_type(Some(variable_type.clone()));
@@ -1001,17 +1012,17 @@ impl<'a> Compiler<'a> {
                 }
                 Err(err) => {
                     match err {
-                        LexerError::UndefinedToken { line, lexeme }
-                            => self.compile_error_at_line(
-                                line,
-                                &format!("undefined token '{}'", lexeme)
-                            ),
-                        LexerError::IncompleteComment { line }
-                            => self.compile_error_at_line(line, "incomplete comment"),
-                        LexerError::IncompleteString { line }
-                            => self.compile_error_at_line(line, "incomplete string"),
-                        LexerError::InternalError { msg, line }
-                            => self.compile_error_at_line(line, &msg)
+                        LexerError::UndefinedToken { line, lexeme } => self
+                            .compile_error_at_line(line, &format!("undefined token '{}'", lexeme)),
+                        LexerError::IncompleteComment { line } => {
+                            self.compile_error_at_line(line, "incomplete comment")
+                        }
+                        LexerError::IncompleteString { line } => {
+                            self.compile_error_at_line(line, "incomplete string")
+                        }
+                        LexerError::InternalError { msg, line } => {
+                            self.compile_error_at_line(line, &msg)
+                        }
                     };
                 }
             }
@@ -1058,7 +1069,7 @@ impl<'a> Compiler<'a> {
                 TokenType::RightBrace | TokenType::Semicolon => {
                     self.advance();
                     break;
-                },
+                }
                 _ => {}
             }
             self.advance();
@@ -1068,13 +1079,10 @@ impl<'a> Compiler<'a> {
     fn check_types(&mut self, expected_type: Option<SquatType>, type_to_check: &SquatType) -> bool {
         if let Some(expected_type) = expected_type {
             if *type_to_check != expected_type {
-                self.compile_error(
-                    &format!(
-                        "Expected {} but found {}",
-                        expected_type,
-                        type_to_check
-                    )
-                );
+                self.compile_error(&format!(
+                    "Expected {} but found {}",
+                    expected_type, type_to_check
+                ));
                 return false;
             }
         }
@@ -1093,8 +1101,8 @@ impl<'a> Compiler<'a> {
         self.scope_depth -= 1;
 
         // Remove the local variables from the stack
-        while self.locals.len() > 0 &&
-            self.locals[self.locals.len() - 1].depth.unwrap_or(0) > self.scope_depth
+        while self.locals.len() > 0
+            && self.locals[self.locals.len() - 1].depth.unwrap_or(0) > self.scope_depth
         {
             self.write_op_code(OpCode::Pop);
             self.locals.pop();
@@ -1104,9 +1112,9 @@ impl<'a> Compiler<'a> {
     fn resolve_native(&mut self, name: &str) -> Option<(usize, SquatType)> {
         if let Some(native_index) = self.natives.iter().position(|x| match x.get_value() {
             SquatValue::Object(SquatObject::NativeFunction(func)) => func.name == name,
-            _ => unreachable!()
+            _ => unreachable!(),
         }) {
-        let native_type: SquatType = self.natives.get(native_index).unwrap().get_type();
+            let native_type: SquatType = self.natives.get(native_index).unwrap().get_type();
             return Some((native_index, native_type));
         }
         None
@@ -1136,16 +1144,20 @@ impl<'a> Compiler<'a> {
     /// Token Linkers
     //////////////////////////////////////////////////////////////////////////
 
-    fn call_prefix(&mut self, token_type: TokenType, expected_type: Option<SquatType>) -> SquatType {
+    fn call_prefix(
+        &mut self,
+        token_type: TokenType,
+        expected_type: Option<SquatType>,
+    ) -> SquatType {
         match token_type {
-            TokenType::LeftParenthesis                          => self.grouping(expected_type),
-            TokenType::Bang | TokenType::Minus                  => self.unary(expected_type),
-            TokenType::Number                                   => self.number(),
+            TokenType::LeftParenthesis => self.grouping(expected_type),
+            TokenType::Bang | TokenType::Minus => self.unary(expected_type),
+            TokenType::Number => self.number(),
             TokenType::False | TokenType::Nil | TokenType::True => self.literal(),
-            TokenType::String                                   => self.string(),
-            TokenType::Identifier                               => self.variable(),
-            TokenType::Eof                                      => SquatType::Nil,
-            _ => { 
+            TokenType::String => self.string(),
+            TokenType::Identifier => self.variable(),
+            TokenType::Eof => SquatType::Nil,
+            _ => {
                 self.compile_error("Illegal expression");
                 SquatType::Nil
             }
@@ -1154,11 +1166,17 @@ impl<'a> Compiler<'a> {
 
     fn call_infix(&mut self, token_type: TokenType, expected_type: Option<SquatType>) -> SquatType {
         match token_type {
-            TokenType::Minus | TokenType::Plus | TokenType::Slash | TokenType::Star |
-                TokenType::Percent |
-                TokenType::BangEqual | TokenType::EqualEqual |
-                TokenType::Greater | TokenType::GreaterEqual |
-                TokenType::Less | TokenType::LessEqual => self.binary(expected_type),
+            TokenType::Minus
+            | TokenType::Plus
+            | TokenType::Slash
+            | TokenType::Star
+            | TokenType::Percent
+            | TokenType::BangEqual
+            | TokenType::EqualEqual
+            | TokenType::Greater
+            | TokenType::GreaterEqual
+            | TokenType::Less
+            | TokenType::LessEqual => self.binary(expected_type),
             TokenType::And => self.and(),
             TokenType::Or => self.or(),
             _ => {
@@ -1171,24 +1189,25 @@ impl<'a> Compiler<'a> {
 
     fn get_precedence(&self, token_type: TokenType) -> Precedence {
         match token_type {
-            TokenType::Plus |
-                TokenType::Minus | TokenType::Percent => Precedence::Term,
+            TokenType::Plus | TokenType::Minus | TokenType::Percent => Precedence::Term,
             TokenType::Star | TokenType::Slash => Precedence::Factor,
-                TokenType::BangEqual | TokenType::EqualEqual => Precedence::Equality,
-            TokenType::Greater | TokenType::GreaterEqual |
-                TokenType::Less | TokenType::LessEqual => Precedence::Comparison,
+            TokenType::BangEqual | TokenType::EqualEqual => Precedence::Equality,
+            TokenType::Greater
+            | TokenType::GreaterEqual
+            | TokenType::Less
+            | TokenType::LessEqual => Precedence::Comparison,
             TokenType::And => Precedence::And,
             TokenType::Or => Precedence::Or,
             TokenType::Question => Precedence::Ternary,
             TokenType::LeftParenthesis => Precedence::Call,
-            _ => Precedence::None
+            _ => Precedence::None,
         }
     }
 
     //////////////////////////////////////////////////////////////////////////
     /// Jumps
     //////////////////////////////////////////////////////////////////////////
-    
+
     fn emit_jump(&mut self, op_code: OpCode) -> usize {
         self.write_op_code(op_code);
         self.main_chunk.get_size() - 1

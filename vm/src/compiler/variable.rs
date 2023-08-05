@@ -5,15 +5,15 @@ pub struct CompilerLocal {
     pub name: String,
     // If this value is missing, the variable is not initialized yet.
     pub depth: Option<u32>,
-    squat_type: Option<SquatType>
+    squat_type: Option<SquatType>,
 }
 
 impl CompilerLocal {
     pub fn new(name: &str, depth: Option<u32>, squat_type: Option<SquatType>) -> CompilerLocal {
         CompilerLocal {
-            name:name.to_string(),
+            name: name.to_string(),
             depth,
-            squat_type
+            squat_type,
         }
     }
 
@@ -29,14 +29,14 @@ impl CompilerLocal {
 #[derive(Debug)]
 pub struct CompilerNative {
     squat_value: SquatValue,
-    squat_type: SquatType
+    squat_type: SquatType,
 }
 
 impl CompilerNative {
     pub fn new(squat_value: SquatValue, squat_type: SquatType) -> CompilerNative {
         CompilerNative {
-           squat_value,
-           squat_type
+            squat_value,
+            squat_type,
         }
     }
 
@@ -53,7 +53,7 @@ impl CompilerNative {
 pub struct CompilerGlobal {
     pub index: usize,
     pub initialized: bool,
-    squat_type: Option<SquatType>
+    squat_type: Option<SquatType>,
 }
 
 impl CompilerGlobal {
@@ -61,7 +61,7 @@ impl CompilerGlobal {
         CompilerGlobal {
             index,
             initialized,
-            squat_type
+            squat_type,
         }
     }
 
