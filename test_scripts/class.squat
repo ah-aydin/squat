@@ -12,4 +12,10 @@ func main() {
     Person person = Person("gigel", 20, 184);
     println(Person);
     println(person);
+    println(person.name);
+    print("The sum of the age and height is ");
+    var the_sum = person.age + person.height;
+    println(person.age + person.height);
+    println(the_sum);
+    println(type(the_sum));
 }

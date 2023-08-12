@@ -862,8 +862,8 @@ impl<'a> Compiler<'a> {
         rhs_type
     }
 
-    fn call(&mut self, func_data: SquatType) -> SquatType {
-        match func_data {
+    fn call(&mut self, object_data: SquatType) -> SquatType {
+        match object_data {
             SquatType::Function(data) | SquatType::NativeFunction(data) => {
                 let mut arg_count = 0;
                 if !self.check_current(TokenType::RightParenthesis) {
@@ -913,6 +913,43 @@ impl<'a> Compiler<'a> {
                 data.get_instance_type()
             }
             _ => unreachable!("call"),
+        }
+    }
+
+    fn property(&mut self, object_data: SquatType) -> SquatType {
+        match object_data {
+            SquatType::Instance(data) => {
+                let class_name = data.class.clone();
+                self.consume_current(
+                    TokenType::Identifier,
+                    &format!("Expected property name for {}", class_name),
+                );
+                let property_name = self.previous_token.as_ref().unwrap().lexeme.clone();
+                let field_result = self
+                    .classes
+                    .get(&class_name)
+                    .unwrap()
+                    .get_field_type_and_index_by_name(&property_name)
+                    .clone();
+
+                match field_result {
+                    Ok((field_type, index)) => {
+                        self.write_op_code(OpCode::GetProperty(index));
+                        field_type
+                    }
+                    Err(()) => {
+                        self.compile_error(&format!(
+                            "{} does not have a property called {}.",
+                            class_name, property_name
+                        ));
+                        SquatType::Nil
+                    }
+                }
+            }
+            _ => {
+                self.compile_error("Can only use '.' to fetch property of a class instance");
+                SquatType::Nil
+            }
         }
     }
 
@@ -1007,9 +1044,16 @@ impl<'a> Compiler<'a> {
         if let Some((index, t)) = self.resolve_local(&var_name) {
             set_op_code = OpCode::SetLocal(index);
             get_op_code = OpCode::GetLocal(index);
-            if let SquatType::Function(_) = t.clone() {
-                is_object = true;
-                object_data = t.clone();
+            match t.clone() {
+                SquatType::Function(_) => {
+                    is_object = true;
+                    object_data = t.clone();
+                }
+                SquatType::Instance(_) => {
+                    is_object = true;
+                    object_data = t.clone();
+                }
+                _ => {}
             }
             variable_type = t;
         } else if let Some((index, t)) = self.resolve_global(&var_name) {
@@ -1024,13 +1068,17 @@ impl<'a> Compiler<'a> {
                     is_object = true;
                     object_data = t.clone();
                 }
+                SquatType::Instance(_) => {
+                    is_object = true;
+                    object_data = t.clone();
+                }
                 _ => {}
             };
             variable_type = t;
         } else if let Some((index, t)) = self.resolve_native(&var_name) {
             set_op_code = OpCode::Nil; // Just to keep the compiler happy
             get_op_code = OpCode::GetNative(index);
-            if let SquatType::NativeFunction(data) = t.clone() {
+            if let SquatType::NativeFunction(_) = t.clone() {
                 is_object = true;
                 object_data = t.clone();
             }
@@ -1061,6 +1109,8 @@ impl<'a> Compiler<'a> {
             if is_object {
                 if self.check_current(TokenType::LeftParenthesis) {
                     return self.call(object_data.clone());
+                } else if self.check_current(TokenType::Dot) {
+                    return self.property(object_data.clone());
                 }
                 return object_data;
             }

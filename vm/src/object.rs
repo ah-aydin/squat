@@ -18,21 +18,25 @@ impl SquatClass {
 #[derive(Debug, Clone, Default)]
 pub struct SquatInstance {
     pub instance_of: String,
-    fields: Vec<SquatValue>,
+    properties: Vec<SquatValue>,
 }
 impl SquatInstance {
-    pub fn new(instance_of: &str, fields: Vec<SquatValue>) -> SquatInstance {
+    pub fn new(instance_of: &str, properties: Vec<SquatValue>) -> SquatInstance {
         SquatInstance {
             instance_of: instance_of.to_string(),
-            fields,
+            properties,
         }
+    }
+
+    pub fn get_property(&self, index: usize) -> SquatValue {
+        self.properties.get(index).unwrap().clone()
     }
 }
 
 impl PartialEq for SquatInstance {
     fn eq(&self, other: &Self) -> bool {
         if self.instance_of == other.instance_of {
-            return self.fields == other.fields;
+            return self.properties == other.properties;
         }
         false
     }
@@ -103,7 +107,7 @@ impl ToString for SquatObject {
             SquatObject::Class(class) => format!("<class {}>", class.name),
             SquatObject::Instance(instance) => format!(
                 "<instance of {} {:?}>",
-                instance.instance_of, instance.fields
+                instance.instance_of, instance.properties
             ),
         }
     }

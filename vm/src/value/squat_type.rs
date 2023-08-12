@@ -18,7 +18,6 @@ pub struct SquatClassTypeData {
     pub name: String,
     field_types: Vec<SquatType>,
     fields: HashMap<String, (SquatType, usize)>,
-    methods: HashMap<String, SquatType>,
 }
 
 impl SquatClassTypeData {
@@ -27,7 +26,6 @@ impl SquatClassTypeData {
             name: name.to_string(),
             field_types: vec![],
             fields: HashMap::new(),
-            methods: HashMap::new(),
         }
     }
 
@@ -44,9 +42,12 @@ impl SquatClassTypeData {
         }
     }
 
-    pub fn get_field_type_by_name(&self, field_name: &str) -> Result<SquatType, ()> {
+    pub fn get_field_type_and_index_by_name(
+        &self,
+        field_name: &str,
+    ) -> Result<(SquatType, usize), ()> {
         match self.fields.get(field_name) {
-            Some((field_type, _)) => Ok(field_type.clone()),
+            Some((field_type, index)) => Ok((field_type.clone(), *index)),
             None => Err(()),
         }
     }

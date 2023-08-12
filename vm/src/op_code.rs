@@ -31,6 +31,7 @@ pub enum OpCode {
     GetLocal(usize),
     SetLocal(usize),
     GetNative(usize),
+    GetProperty(usize),
 
     JumpTo(usize),
     JumpIfFalse(usize),
