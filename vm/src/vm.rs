@@ -452,6 +452,12 @@ impl VM {
             native::misc::get_type,
             SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::Type),
         );
+
+        self.define_native_func(
+            "to_str",
+            native::string::to_str,
+            SquatFunctionTypeData::new(vec![SquatType::Any], SquatType::String),
+        );
     }
 
     fn define_native_func(
