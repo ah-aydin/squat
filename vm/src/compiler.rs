@@ -996,7 +996,6 @@ impl<'a> Compiler<'a> {
     }
 
     fn variable(&mut self) -> SquatType {
-        // TODO re-evaluate the assignment of variable_type(SquatType)
         let var_name = self.previous_token.as_ref().unwrap().lexeme.clone();
 
         let set_op_code: OpCode;
@@ -1008,41 +1007,34 @@ impl<'a> Compiler<'a> {
         if let Some((index, t)) = self.resolve_local(&var_name) {
             set_op_code = OpCode::SetLocal(index);
             get_op_code = OpCode::GetLocal(index);
-            if let SquatType::Function(data) = t.clone() {
+            if let SquatType::Function(_) = t.clone() {
                 is_object = true;
                 object_data = t.clone();
-                variable_type = data.get_return_type();
-            } else {
-                variable_type = t;
             }
+            variable_type = t;
         } else if let Some((index, t)) = self.resolve_global(&var_name) {
             set_op_code = OpCode::SetGlobal(index);
             get_op_code = OpCode::GetGlobal(index);
             match t.clone() {
-                SquatType::Function(data) => {
+                SquatType::Function(_) => {
                     is_object = true;
                     object_data = t.clone();
-                    variable_type = data.get_return_type();
                 }
-                SquatType::Class(data) => {
+                SquatType::Class(_) => {
                     is_object = true;
                     object_data = t.clone();
-                    variable_type = data.get_instance_type();
                 }
-                _ => {
-                    variable_type = t;
-                }
+                _ => {}
             };
+            variable_type = t;
         } else if let Some((index, t)) = self.resolve_native(&var_name) {
             set_op_code = OpCode::Nil; // Just to keep the compiler happy
             get_op_code = OpCode::GetNative(index);
             if let SquatType::NativeFunction(data) = t.clone() {
                 is_object = true;
                 object_data = t.clone();
-                variable_type = data.get_return_type();
-            } else {
-                variable_type = t;
             }
+            variable_type = t;
         } else {
             self.compile_error(&format!("{} is not defined.", var_name));
             return SquatType::Nil;
