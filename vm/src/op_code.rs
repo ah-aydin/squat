@@ -39,6 +39,7 @@ pub enum OpCode {
     Loop(usize),
 
     Call(usize),
+    CreateInstance(usize),
     Return,
 
     Start,

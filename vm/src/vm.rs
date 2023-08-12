@@ -2,7 +2,7 @@ use crate::{
     chunk::Chunk,
     compiler::{variable::CompilerNative, CompileStatus, Compiler},
     native,
-    object::{SquatNativeFunction, SquatObject},
+    object::{SquatInstance, SquatNativeFunction, SquatObject},
     op_code::OpCode,
     options::Options,
     value::{
@@ -256,13 +256,6 @@ impl VM {
                         // borrow checker.
                         let native = match self.stack.get(func_data_location).unwrap() {
                             SquatValue::Object(SquatObject::Function(func_data)) => {
-                                if arg_count != func_data.arity {
-                                    self.runtime_error(&format!(
-                                        "Function takes {} arguments but {} were given",
-                                        func_data.arity, arg_count
-                                    ));
-                                    return InterpretResult::InterpretRuntimeError;
-                                }
                                 let return_address =
                                     self.chunks[self.current_chunk].current_instruction;
                                 self.call_stack.push(CallFrame::new(
@@ -278,14 +271,6 @@ impl VM {
                             _ => panic!("Call OpCode expects a FunctionObject on the stack"),
                         };
 
-                        if arg_count != native.arity {
-                            self.runtime_error(&format!(
-                                "Function takes {} arguments but {} were given",
-                                native.arity, arg_count
-                            ));
-                            return InterpretResult::InterpretRuntimeError;
-                        }
-
                         let mut args = Vec::new();
                         for _i in 0..arg_count {
                             args.push(self.stack.pop().unwrap())
@@ -295,6 +280,28 @@ impl VM {
                         match native.call(args) {
                             Ok(value) => self.stack.push(value),
                             Err(msg) => self.runtime_error(&msg),
+                        };
+                    }
+                    OpCode::CreateInstance(arg_count) => {
+                        let arg_count = *arg_count;
+                        let class_data_location = self.stack.len() - 1 - arg_count;
+                        match self.stack.get(class_data_location).unwrap() {
+                            SquatValue::Object(SquatObject::Class(class_data)) => {
+                                let mut args = Vec::new();
+                                for _i in 0..arg_count {
+                                    args.push(self.stack.pop().unwrap())
+                                }
+                                match self.stack.pop() {
+                                    Some(SquatValue::Object(SquatObject::Class(class_data))) => {
+                                        args.reverse();
+                                        self.stack.push(SquatValue::Object(SquatObject::Instance(
+                                            SquatInstance::new(&class_data.name, args),
+                                        )));
+                                    }
+                                    _ => unreachable!(),
+                                }
+                            }
+                            _ => panic!("CreateInstace OpCode expects a Class on the stack"),
                         };
                     }
                     OpCode::Return => {
@@ -443,7 +450,7 @@ impl VM {
         func: native::NativeFunc,
         func_data: SquatFunctionTypeData,
     ) {
-        let native_func = SquatNativeFunction::new(name, func_data.arity, func);
+        let native_func = SquatNativeFunction::new(name, func_data.get_arity(), func);
         let native_object = SquatObject::NativeFunction(native_func);
         let native_value = SquatValue::Object(native_object);
 

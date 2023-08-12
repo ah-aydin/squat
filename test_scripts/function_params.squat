@@ -33,9 +33,6 @@ func call_a_func_with_param_int_int_return_int(int param1, int param2, func(int,
     return value * 2;
 }
 
-class TestClass {
-}
-
 func main() {
     println("hello there");
     func0();
@@ -58,10 +55,6 @@ func main() {
     call_a_func_with_param_int(func1, 1234);
     print("The returned value is: ");
     println(call_a_func_with_param_int_int_return_int(99, 99, sumup));
-
-    
-    println(TestClass);
-    TestClass instance1;
 
     println("hello there");
     func0();

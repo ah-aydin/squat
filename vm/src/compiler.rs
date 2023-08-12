@@ -175,7 +175,7 @@ impl<'a> Compiler<'a> {
                 .unwrap()
                 .clone();
             self.advance();
-            self.var_declaration(Some(SquatType::Class(class_data.clone())));
+            self.var_declaration(Some(class_data.get_instance_type()));
             return true;
         }
         false
@@ -258,16 +258,14 @@ impl<'a> Compiler<'a> {
             Err(_) => return,
         };
 
-        let class_data = SquatClassTypeData::new(&name);
+        let mut class_data = SquatClassTypeData::new(&name);
         self.initialize_object(&name);
         let jump = self.emit_jump(OpCode::Jump(usize::MAX));
 
         let old_scope_type = self.scope_type;
         self.scope_type = ScopeType::Class;
 
-        self.consume_current(TokenType::LeftBrace, "Expected '{' before class body");
-        // TODO include logic for the class body
-        self.consume_current(TokenType::RightBrace, "Expected '}' after class body");
+        self.class_block(&mut class_data);
 
         self.patch_jump(jump);
         self.patch_class(&name, class_data.clone());
@@ -280,6 +278,54 @@ impl<'a> Compiler<'a> {
         self.define_object(index);
 
         self.scope_type = old_scope_type;
+    }
+
+    fn class_block(&mut self, data: &mut SquatClassTypeData) {
+        self.consume_current(TokenType::LeftBrace, "Expected '{' before class body");
+        while !self.check_current(TokenType::RightBrace) {
+            if self.check_current(TokenType::Eof) {
+                self.compile_error("Expected closing '}' to end the class body");
+                break;
+            }
+            if self.check_current(TokenType::Var) {
+                self.compile_error("Cannot use 'Var' to define class field");
+            } else if self.check_current(TokenType::BoolType) {
+                self.define_class_field(data, SquatType::Bool);
+            } else if self.check_current(TokenType::IntType) {
+                self.define_class_field(data, SquatType::Int);
+            } else if self.check_current(TokenType::FloatType) {
+                self.define_class_field(data, SquatType::Float);
+            } else if self.check_current(TokenType::StringType) {
+                self.define_class_field(data, SquatType::String);
+            } else if self
+                .classes
+                .get(&self.current_token.as_ref().unwrap().lexeme)
+                .is_some()
+            {
+                let class_data = self
+                    .classes
+                    .get(&self.current_token.as_ref().unwrap().lexeme)
+                    .unwrap()
+                    .clone();
+                self.advance();
+                self.define_class_field(data, SquatType::Class(class_data));
+            } else {
+                todo!("Implement func");
+            }
+        }
+    }
+
+    fn define_class_field(&mut self, data: &mut SquatClassTypeData, field_type: SquatType) {
+        if !self.check_current(TokenType::Identifier) {
+            self.compile_error("Expected field name");
+            return;
+        }
+        let field_name = self.previous_token.as_ref().unwrap().lexeme.clone();
+        data.add_field(&field_name, field_type);
+        self.consume_current(
+            TokenType::Semicolon,
+            "Expected ';' at the end of field declaraton",
+        );
     }
 
     fn function_declaration(&mut self) {
@@ -431,24 +477,17 @@ impl<'a> Compiler<'a> {
                 }
                 SquatType::Function(data) => {
                     var_type = SquatType::Function(data);
-                    Some(
-                        self.constants
-                            .write(SquatValue::Object(
-                                SquatObject::Function(Default::default()),
-                            )),
-                    )
+                    self.compile_error(&format!("Must define function"));
+                    None
                 }
                 SquatType::NativeFunction(data) => {
                     var_type = SquatType::NativeFunction(data);
-                    Some(
-                        self.constants
-                            .write(SquatValue::Object(
-                                SquatObject::Function(Default::default()),
-                            )),
-                    )
+                    self.compile_error(&format!("Cannot declare native function"));
+                    None
                 }
                 SquatType::Class(data) => {
                     var_type = SquatType::Class(data);
+                    self.compile_error(&format!("Must define class"));
                     None
                 }
                 _ => unreachable!("var_declaration"),
@@ -828,16 +867,50 @@ impl<'a> Compiler<'a> {
             SquatType::Function(data) | SquatType::NativeFunction(data) => {
                 let mut arg_count = 0;
                 if !self.check_current(TokenType::RightParenthesis) {
-                    while !self.check_current(TokenType::RightParenthesis) {
+                    while !self.check_current(TokenType::RightParenthesis)
+                        && arg_count <= data.get_arity()
+                    {
                         let expression_type = self.expression();
                         self.check_types(Some(data.get_param_type(arg_count)), &expression_type);
                         arg_count += 1;
                         self.check_current(TokenType::Comma);
                     }
                 }
+                if arg_count != data.get_arity() {
+                    self.compile_error(&format!(
+                        "Expected {} arguments but got {}.",
+                        data.get_arity(),
+                        arg_count
+                    ));
+                }
 
                 self.write_op_code(OpCode::Call(arg_count));
                 data.get_return_type()
+            }
+            SquatType::Class(data) => {
+                let mut arg_count = 0;
+                if !self.check_current(TokenType::RightParenthesis) {
+                    while !self.check_current(TokenType::RightParenthesis)
+                        && arg_count <= data.get_field_count()
+                    {
+                        let expression_type = self.expression();
+                        self.check_types(
+                            Some(data.get_field_type_by_index(arg_count)),
+                            &expression_type,
+                        );
+                        arg_count += 1;
+                        self.check_current(TokenType::Comma);
+                    }
+                }
+                if arg_count != data.get_field_count() {
+                    self.compile_error(&format!(
+                        "Expected {} arguments but got {}.",
+                        data.get_field_count(),
+                        arg_count
+                    ));
+                }
+                self.write_op_code(OpCode::CreateInstance(arg_count));
+                data.get_instance_type()
             }
             _ => unreachable!("call"),
         }
@@ -923,20 +996,21 @@ impl<'a> Compiler<'a> {
     }
 
     fn variable(&mut self) -> SquatType {
+        // TODO re-evaluate the assignment of variable_type(SquatType)
         let var_name = self.previous_token.as_ref().unwrap().lexeme.clone();
 
         let set_op_code: OpCode;
         let get_op_code: OpCode;
         let variable_type: SquatType;
-        let mut func_data: SquatType = Default::default();
-        let mut is_func: bool = false;
+        let mut object_data: SquatType = Default::default();
+        let mut is_object: bool = false;
 
         if let Some((index, t)) = self.resolve_local(&var_name) {
             set_op_code = OpCode::SetLocal(index);
             get_op_code = OpCode::GetLocal(index);
             if let SquatType::Function(data) = t.clone() {
-                is_func = true;
-                func_data = t.clone();
+                is_object = true;
+                object_data = t.clone();
                 variable_type = data.get_return_type();
             } else {
                 variable_type = t;
@@ -944,19 +1018,27 @@ impl<'a> Compiler<'a> {
         } else if let Some((index, t)) = self.resolve_global(&var_name) {
             set_op_code = OpCode::SetGlobal(index);
             get_op_code = OpCode::GetGlobal(index);
-            if let SquatType::Function(data) = t.clone() {
-                is_func = true;
-                func_data = t.clone();
-                variable_type = data.get_return_type();
-            } else {
-                variable_type = t;
-            }
+            match t.clone() {
+                SquatType::Function(data) => {
+                    is_object = true;
+                    object_data = t.clone();
+                    variable_type = data.get_return_type();
+                }
+                SquatType::Class(data) => {
+                    is_object = true;
+                    object_data = t.clone();
+                    variable_type = data.get_instance_type();
+                }
+                _ => {
+                    variable_type = t;
+                }
+            };
         } else if let Some((index, t)) = self.resolve_native(&var_name) {
             set_op_code = OpCode::Nil; // Just to keep the compiler happy
             get_op_code = OpCode::GetNative(index);
             if let SquatType::NativeFunction(data) = t.clone() {
-                is_func = true;
-                func_data = t.clone();
+                is_object = true;
+                object_data = t.clone();
                 variable_type = data.get_return_type();
             } else {
                 variable_type = t;
@@ -967,9 +1049,9 @@ impl<'a> Compiler<'a> {
         }
 
         if self.check_current(TokenType::Equal) {
-            if is_func {
+            if is_object {
                 self.compile_error(&format!(
-                    "Cannot change assignment of function '{}",
+                    "Cannot change assignment of an object: {}",
                     var_name
                 ));
                 return SquatType::Nil;
@@ -984,11 +1066,11 @@ impl<'a> Compiler<'a> {
             self.write_op_code(set_op_code);
         } else {
             self.write_op_code(get_op_code);
-            if is_func {
+            if is_object {
                 if self.check_current(TokenType::LeftParenthesis) {
-                    return self.call(func_data.clone());
+                    return self.call(object_data.clone());
                 }
-                return func_data;
+                return object_data;
             }
         }
 

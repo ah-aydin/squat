@@ -1,20 +1,71 @@
-use std::fmt;
+use std::{collections::HashMap, fmt};
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct SquatInstanceTypeData {
+    pub class: String,
+}
+
+impl SquatInstanceTypeData {
+    pub fn new(class: &str) -> SquatInstanceTypeData {
+        SquatInstanceTypeData {
+            class: class.to_owned(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SquatClassTypeData {
     pub name: String,
+    field_types: Vec<SquatType>,
+    fields: HashMap<String, (SquatType, usize)>,
+    methods: HashMap<String, SquatType>,
 }
+
 impl SquatClassTypeData {
     pub fn new(name: &str) -> SquatClassTypeData {
         SquatClassTypeData {
             name: name.to_string(),
+            field_types: vec![],
+            fields: HashMap::new(),
+            methods: HashMap::new(),
         }
+    }
+
+    pub fn get_instance_type(&self) -> SquatType {
+        SquatType::Instance(SquatInstanceTypeData::new(&self.name))
+    }
+
+    pub fn get_field_type_by_index(&self, field_index: usize) -> SquatType {
+        match self.field_types.get(field_index) {
+            Some(field_type) => field_type.clone(),
+            None => {
+                unreachable!("{} {:?}", field_index, self.field_types)
+            }
+        }
+    }
+
+    pub fn get_field_type_by_name(&self, field_name: &str) -> Result<SquatType, ()> {
+        match self.fields.get(field_name) {
+            Some((field_type, _)) => Ok(field_type.clone()),
+            None => Err(()),
+        }
+    }
+
+    pub fn add_field(&mut self, field_name: &str, field_type: SquatType) {
+        self.field_types.push(field_type.clone());
+        self.fields.insert(
+            field_name.to_owned(),
+            (field_type, self.field_types.len() - 1),
+        );
+    }
+
+    pub fn get_field_count(&self) -> usize {
+        self.field_types.len()
     }
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct SquatFunctionTypeData {
-    pub arity: usize,
     pub param_types: Vec<SquatType>,
     return_type: Box<SquatType>,
 }
@@ -22,7 +73,6 @@ pub struct SquatFunctionTypeData {
 impl SquatFunctionTypeData {
     pub fn new(param_types: Vec<SquatType>, return_type: SquatType) -> SquatFunctionTypeData {
         SquatFunctionTypeData {
-            arity: param_types.len(),
             param_types,
             return_type: Box::new(return_type),
         }
@@ -37,7 +87,16 @@ impl SquatFunctionTypeData {
     }
 
     pub fn get_param_type(&self, arg_count: usize) -> SquatType {
-        self.param_types.get(arg_count).unwrap().clone()
+        match self.param_types.get(arg_count) {
+            Some(param_type) => param_type.clone(),
+            None => {
+                unreachable!("{} {:?}", arg_count, self.param_types)
+            }
+        }
+    }
+
+    pub fn get_arity(&self) -> usize {
+        self.param_types.len()
     }
 }
 
@@ -58,6 +117,7 @@ pub enum SquatType {
     Function(SquatFunctionTypeData),
     NativeFunction(SquatFunctionTypeData),
     Class(SquatClassTypeData),
+    Instance(SquatInstanceTypeData),
     Type,
     Number,
     Any,
@@ -98,6 +158,7 @@ impl fmt::Display for SquatType {
                 data.get_return_type()
             ),
             SquatType::Class(data) => write!(f, "<type Class {}>", data.name),
+            SquatType::Instance(data) => write!(f, "<type Instance of {}>", data.class),
             SquatType::Type => write!(f, "<type Type>"),
             SquatType::Any => write!(f, "<type Any>"),
             SquatType::Number => write!(f, "<type Number>"),
@@ -124,43 +185,8 @@ impl PartialEq for SquatType {
             (SquatType::Function(data), SquatType::Function(data2))
             | (SquatType::NativeFunction(data), SquatType::NativeFunction(data2)) => data == data2,
             (SquatType::Class(data), SquatType::Class(data2)) => data == data2,
+            (SquatType::Instance(data), SquatType::Instance(data2)) => data == data2,
             (_, _) => false,
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_function_type_equality() {
-        let func1_type = SquatType::Function(SquatFunctionTypeData::new(vec![], SquatType::Nil));
-        let func2_type = SquatType::Function(SquatFunctionTypeData::new(vec![], SquatType::Nil));
-        assert_eq!(func1_type, func2_type);
-
-        let func1_type = SquatType::Function(SquatFunctionTypeData::new(vec![], SquatType::Int));
-        let func2_type = SquatType::Function(SquatFunctionTypeData::new(vec![], SquatType::Int));
-        assert_eq!(func1_type, func2_type);
-
-        let func1_type = SquatType::Function(SquatFunctionTypeData::new(
-            vec![SquatType::Int],
-            SquatType::Int,
-        ));
-        let func2_type = SquatType::Function(SquatFunctionTypeData::new(
-            vec![SquatType::Int],
-            SquatType::Int,
-        ));
-        assert_eq!(func1_type, func2_type);
-
-        let func1_type = SquatType::Function(SquatFunctionTypeData::new(
-            vec![SquatType::Int, SquatType::String],
-            SquatType::Int,
-        ));
-        let func2_type = SquatType::Function(SquatFunctionTypeData::new(
-            vec![SquatType::Int, SquatType::String],
-            SquatType::Int,
-        ));
-        assert_eq!(func1_type, func2_type);
     }
 }

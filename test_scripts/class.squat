@@ -1,0 +1,15 @@
+class Person {
+    string name;
+    int age;
+    int height;
+}
+
+func func1() {
+    println("This is func 1");
+}
+
+func main() {
+    Person person = Person("gigel", 20, 184);
+    println(Person);
+    println(person);
+}

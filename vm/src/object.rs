@@ -1,6 +1,6 @@
 use crate::{
     native::{NativeFunc, NativeFuncArgs, NativeFuncReturnType},
-    value::squat_type::SquatType,
+    value::{squat_type::SquatType, squat_value::SquatValue},
 };
 
 #[derive(Debug, Clone, Default)]
@@ -12,6 +12,29 @@ impl SquatClass {
         SquatClass {
             name: name.to_string(),
         }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SquatInstance {
+    pub instance_of: String,
+    fields: Vec<SquatValue>,
+}
+impl SquatInstance {
+    pub fn new(instance_of: &str, fields: Vec<SquatValue>) -> SquatInstance {
+        SquatInstance {
+            instance_of: instance_of.to_string(),
+            fields,
+        }
+    }
+}
+
+impl PartialEq for SquatInstance {
+    fn eq(&self, other: &Self) -> bool {
+        if self.instance_of == other.instance_of {
+            return self.fields == other.fields;
+        }
+        false
     }
 }
 
@@ -58,6 +81,7 @@ pub enum SquatObject {
     Function(SquatFunction),
     NativeFunction(SquatNativeFunction),
     Class(SquatClass),
+    Instance(SquatInstance),
 }
 
 impl SquatObject {
@@ -66,6 +90,7 @@ impl SquatObject {
             SquatObject::Function(_) => SquatType::Function(Default::default()),
             SquatObject::NativeFunction(_) => SquatType::NativeFunction(Default::default()),
             SquatObject::Class(_) => SquatType::Class(Default::default()),
+            SquatObject::Instance(_) => SquatType::Instance(Default::default()),
         }
     }
 }
@@ -76,6 +101,10 @@ impl ToString for SquatObject {
             SquatObject::Function(func) => format!("<func {}>", func.name),
             SquatObject::NativeFunction(func) => format!("<native func {}>", func.name),
             SquatObject::Class(class) => format!("<class {}>", class.name),
+            SquatObject::Instance(instance) => format!(
+                "<instance of {} {:?}>",
+                instance.instance_of, instance.fields
+            ),
         }
     }
 }
@@ -90,6 +119,9 @@ impl PartialEq for SquatObject {
                 func1.name == func2.name
             }
             (SquatObject::Class(class1), SquatObject::Class(class2)) => class1.name == class2.name,
+            (SquatObject::Instance(instance1), SquatObject::Instance(instance2)) => {
+                instance1 == instance2
+            }
             _ => false,
         }
     }
