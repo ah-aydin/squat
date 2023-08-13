@@ -44,6 +44,14 @@ impl std::ops::Add<u8> for Precedence {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+enum ObjectType {
+    Function,
+    Class,
+    Instance,
+    NotObject,
+}
+
 /// ```rust
 /// // Contains global variable count
 /// Success(usize)
@@ -1063,34 +1071,35 @@ impl<'a> Compiler<'a> {
         let set_op_code: OpCode;
         let get_op_code: OpCode;
         let variable_type: SquatType;
-        let mut is_object: bool = false;
+        let object_type: ObjectType;
 
         if let Some((index, t)) = self.resolve_local(&var_name) {
             set_op_code = OpCode::SetLocal(index);
             get_op_code = OpCode::GetLocal(index);
             variable_type = t;
             match variable_type {
-                SquatType::Function(_) | SquatType::Instance(_) => {
-                    is_object = true;
-                }
-                _ => {}
+                SquatType::Function(_) => object_type = ObjectType::Function,
+                SquatType::Instance(_) => object_type = ObjectType::Instance,
+                _ => object_type = ObjectType::NotObject,
             }
         } else if let Some((index, t)) = self.resolve_global(&var_name) {
             set_op_code = OpCode::SetGlobal(index);
             get_op_code = OpCode::GetGlobal(index);
             variable_type = t;
             match variable_type {
-                SquatType::Function(_) | SquatType::Class(_) | SquatType::Instance(_) => {
-                    is_object = true;
-                }
-                _ => {}
+                SquatType::Function(_) => object_type = ObjectType::Function,
+                SquatType::Instance(_) => object_type = ObjectType::Instance,
+                SquatType::Class(_) => object_type = ObjectType::Class,
+                _ => object_type = ObjectType::NotObject,
             };
         } else if let Some((index, t)) = self.resolve_native(&var_name) {
             set_op_code = OpCode::Nil; // Just to keep the compiler happy
             get_op_code = OpCode::GetNative(index);
             variable_type = t;
             if let SquatType::NativeFunction(_) = variable_type {
-                is_object = true;
+                object_type = ObjectType::Function;
+            } else {
+                object_type = ObjectType::NotObject;
             }
         } else {
             self.compile_error(&format!("{} is not defined.", var_name));
@@ -1098,7 +1107,7 @@ impl<'a> Compiler<'a> {
         }
 
         if self.check_current(TokenType::Equal) {
-            if is_object {
+            if object_type != ObjectType::NotObject {
                 self.compile_error(&format!(
                     "Cannot change assignment of an object: {}",
                     var_name
@@ -1115,7 +1124,7 @@ impl<'a> Compiler<'a> {
             self.write_op_code(set_op_code);
         } else {
             self.write_op_code(get_op_code);
-            if is_object {
+            if object_type != ObjectType::NotObject {
                 if self.check_current(TokenType::LeftParenthesis) {
                     return self.call(variable_type.clone());
                 } else if self.check_current(TokenType::Dot) {
