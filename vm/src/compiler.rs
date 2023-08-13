@@ -531,6 +531,17 @@ impl<'a> Compiler<'a> {
                     Some(self.parse_function_type())
                 }
             }
+            TokenType::Identifier => {
+                if let Some(class_data) = self
+                    .classes
+                    .get(&self.current_token.as_ref().unwrap().lexeme)
+                    .cloned()
+                {
+                    self.advance();
+                    return Some(class_data.get_instance_type());
+                }
+                None
+            }
             _ => None,
         }
     }

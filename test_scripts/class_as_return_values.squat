@@ -1,0 +1,17 @@
+class Person {
+    int age;
+    int height;
+    string name;
+}
+
+func build_person(int age, int height, string name) Person {
+    Person person = Person(age, height, name);
+    return person;
+}
+
+func main() {
+    Person person1 = build_person(20, 177, "Gigel");
+    println(person1.age);
+    println(person1.height);
+    println(person1.name);
+}
