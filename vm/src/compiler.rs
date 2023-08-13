@@ -341,7 +341,6 @@ impl<'a> Compiler<'a> {
             "Expect '(' after function name.",
         );
         let is_main: bool;
-        let mut arity: usize = 0;
 
         if func_name == "main" {
             if self.found_main {
@@ -411,7 +410,6 @@ impl<'a> Compiler<'a> {
         let starting_index = self.main_chunk.get_size() - 1;
 
         if !is_main {
-            arity = param_types.len();
             self.patch_function(
                 &func_name,
                 SquatFunctionTypeData::new(param_types, return_type.clone()),
@@ -430,7 +428,7 @@ impl<'a> Compiler<'a> {
         self.patch_jump(jump);
         if !is_main {
             let function_obj =
-                SquatObject::Function(SquatFunction::new(&func_name, starting_index, arity));
+                SquatObject::Function(SquatFunction::new(&func_name, starting_index));
             let constant_index = self.constants.write(SquatValue::Object(function_obj));
             self.write_op_code(OpCode::Constant(constant_index));
             self.define_object(index);

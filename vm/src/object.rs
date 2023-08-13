@@ -46,15 +46,13 @@ impl PartialEq for SquatInstance {
 pub struct SquatFunction {
     pub name: String,
     pub start_instruction_index: usize,
-    pub arity: usize,
 }
 
 impl SquatFunction {
-    pub fn new(name: &str, start_instruction_index: usize, arity: usize) -> SquatFunction {
+    pub fn new(name: &str, start_instruction_index: usize) -> SquatFunction {
         SquatFunction {
             name: name.to_owned(),
             start_instruction_index,
-            arity,
         }
     }
 }
