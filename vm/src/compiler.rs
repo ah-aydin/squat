@@ -1109,14 +1109,8 @@ impl<'a> Compiler<'a> {
         if self.check_current(TokenType::Equal) {
             if object_type != ObjectType::NotObject {
                 self.compile_error(&format!(
-                    "Cannot change assignment of an object: {}",
-                    var_name
-                ));
-                return SquatType::Nil;
-            } else if let OpCode::GetNative(_) = get_op_code {
-                self.compile_error(&format!(
-                    "Cannot change assignment of native object '{}'",
-                    var_name
+                    "Cannot change assignment of an object of type '{:?}': {}",
+                    object_type, var_name
                 ));
                 return SquatType::Nil;
             }
