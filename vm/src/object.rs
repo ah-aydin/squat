@@ -31,6 +31,10 @@ impl SquatInstance {
     pub fn get_property(&self, index: usize) -> SquatValue {
         self.properties.get(index).unwrap().clone()
     }
+
+    pub fn set_property(&mut self, index: usize, value: SquatValue) {
+        self.properties[index] = value;
+    }
 }
 
 impl PartialEq for SquatInstance {

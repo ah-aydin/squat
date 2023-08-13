@@ -966,17 +966,31 @@ impl<'a> Compiler<'a> {
                     .clone()
                 {
                     Ok((field_type, property_index)) => {
-                        match get_op_code {
-                            Some(OpCode::GetGlobal(object_index)) => self.write_op_code(
-                                OpCode::GetGlobalProperty(object_index, property_index),
-                            ),
-                            Some(OpCode::GetLocal(object_index)) => self.write_op_code(
-                                OpCode::GetLocalProperty(object_index, property_index),
-                            ),
-                            None => self.write_op_code(OpCode::GetProperty(property_index)),
-                            Some(_) => unreachable!(),
-                        };
-                        field_type
+                        if self.check_current(TokenType::Equal) {
+                            self.expression_with_type(Some(field_type.clone()));
+                            match get_op_code {
+                                Some(OpCode::GetGlobal(object_index)) => self.write_op_code(
+                                    OpCode::SetGlobalProperty(object_index, property_index),
+                                ),
+                                Some(OpCode::GetLocal(object_index)) => self.write_op_code(
+                                    OpCode::SetLocalProperty(object_index, property_index),
+                                ),
+                                _ => self.compile_error("Cannot change value of property of an instance that is not going to be stored"),
+                            }
+                            field_type
+                        } else {
+                            match get_op_code {
+                                Some(OpCode::GetGlobal(object_index)) => self.write_op_code(
+                                    OpCode::GetGlobalProperty(object_index, property_index),
+                                ),
+                                Some(OpCode::GetLocal(object_index)) => self.write_op_code(
+                                    OpCode::GetLocalProperty(object_index, property_index),
+                                ),
+                                None => self.write_op_code(OpCode::GetProperty(property_index)),
+                                Some(_) => unreachable!(),
+                            };
+                            field_type
+                        }
                     }
                     Err(_) => {
                         self.compile_error(&format!(

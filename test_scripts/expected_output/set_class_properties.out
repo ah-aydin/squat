@@ -1,0 +1,17 @@
+Compiling and running file: test_scripts/set_class_properties.squat
+29
+29
+Before change
+<instance of Person [Int(29), Int(120), String("short guy")]>
+After change
+<instance of Person [Int(39), Int(199), String("now dis guy is tall guy")]>
+320
+320
+320
+<instance of Person [Int(320), Int(199), String("now dis guy is tall guy")]>
+<instance of Person [Int(320), Int(199), String("new name")]>
+<instance of Person [Int(9), Int(123), String("global")]>
+<instance of Person [Int(9), Int(123), String("ofya")]>
+<instance of Person [Int(320), Int(199), String("ofya")]>
+<instance of Person [Int(320), Int(199), String("last name")]>
+<instance of Person [Int(9), Int(123), String("last name")]>

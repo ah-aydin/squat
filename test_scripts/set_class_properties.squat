@@ -4,12 +4,12 @@ class Person {
     string name;
 }
 
-Person global_guy = Person(10, 123, "global");
+Person global_guy = Person(9, 123, "global");
 
 func main() {
-    Person person = Person(30, 120, "short guy");
-    int a = 1;
-    int b = 2;
+    Person person = Person(29, 120, "short guy");
+    int a = 0;
+    int b = 1;
 
     a = b = person.age;
     println(a);
@@ -18,14 +18,14 @@ func main() {
     println("Before change");
     println(person);
     
-    person.age = 40;
-    person.height = 200;
+    person.age = 39;
+    person.height = 199;
     person.name = "now dis guy is tall guy";
 
     println("After change");
     println(person);
 
-    person.age = a = b = 321;
+    person.age = a = b = 320;
     println(person.age);
     println(a);
     println(b);
@@ -43,3 +43,4 @@ func main() {
     println(person);
     println(global_guy);
 }
+

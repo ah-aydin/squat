@@ -34,6 +34,8 @@ pub enum OpCode {
     GetGlobalProperty(usize, usize),
     GetLocalProperty(usize, usize),
     GetProperty(usize),
+    SetGlobalProperty(usize, usize),
+    SetLocalProperty(usize, usize),
 
     JumpTo(usize),
     JumpIfFalse(usize),

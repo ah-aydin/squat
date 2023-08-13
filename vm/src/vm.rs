@@ -142,6 +142,7 @@ impl VM {
                     OpCode::Multiply => self.binary_op(|left, right| left * right),
                     OpCode::Divide => self.binary_op(|left, right| left / right),
                     OpCode::Mod => self.binary_op(|left, right| left % right),
+
                     OpCode::Equal => self.binary_cmp(|left, right| left == right),
                     OpCode::NotEqual => self.binary_cmp(|left, right| left != right),
                     OpCode::Greater => self.binary_cmp(|left, right| left > right),
@@ -153,7 +154,7 @@ impl VM {
                         if let Some(value) = self.stack.pop() {
                             self.stack.push(SquatValue::Bool(!value.is_truthy()));
                         } else {
-                            panic!("'!' cannot be used alone");
+                            unreachable!("'!' cannot be used alone");
                         }
                     }
                     OpCode::Negate => match self.stack.pop() {
@@ -175,7 +176,7 @@ impl VM {
                         if let Some(value) = self.stack.pop() {
                             self.globals[index] = Some(value);
                         } else {
-                            panic!("DefineGlobal OpCode expects a value to be on the stack");
+                            unreachable!("DefineGlobal OpCode expects a value to be on the stack");
                         }
                     }
                     OpCode::GetGlobal(index) => {
@@ -200,7 +201,7 @@ impl VM {
                                 ));
                             }
                         } else {
-                            panic!("SetGlobal OpCode expects a value to be on the stack");
+                            unreachable!("SetGlobal OpCode expects a value to be on the stack");
                         }
                     }
 
@@ -213,12 +214,14 @@ impl VM {
                             let index = index + self.call_stack.last().unwrap().stack_index;
                             self.stack[index] = value.clone();
                         } else {
-                            panic!("SetLocal OpCode expects a value to be on the stack");
+                            unreachable!("SetLocal OpCode expects a value to be on the stack");
                         }
                     }
+
                     OpCode::GetNative(index) => {
                         self.stack.push(self.natives[*index].get_value().clone());
                     }
+
                     OpCode::GetGlobalProperty(object_index, property_index) => {
                         if let Some(Some(SquatValue::Object(SquatObject::Instance(
                             instance_data,
@@ -257,6 +260,34 @@ impl VM {
                             );
                         }
                     }
+                    OpCode::SetGlobalProperty(object_index, property_index) => {
+                        let object = &mut self.globals[*object_index];
+                        if let Some(SquatValue::Object(SquatObject::Instance(instance_data))) =
+                            object
+                        {
+                            instance_data
+                                .set_property(*property_index, self.stack.last().unwrap().clone());
+                        } else {
+                            unreachable!(
+                                "SetGlobalProperty expected a class instance at global position {}",
+                                object_index
+                            );
+                        }
+                    }
+                    OpCode::SetLocalProperty(object_index, property_index) => {
+                        let stack_index =
+                            object_index + self.call_stack.last().unwrap().stack_index;
+                        let value = self.stack.last().unwrap().clone();
+                        let object = &mut self.stack[stack_index];
+                        if let SquatValue::Object(SquatObject::Instance(instance_data)) = object {
+                            instance_data.set_property(*property_index, value);
+                        } else {
+                            unreachable!(
+                                "SetLocalProperty expected a class instance at global position {}",
+                                object_index
+                            );
+                        }
+                    }
 
                     OpCode::JumpTo(instruction_number) => {
                         self.chunks[self.current_chunk].current_instruction = *instruction_number;
@@ -267,7 +298,7 @@ impl VM {
                                 self.chunks[self.current_chunk].current_instruction += *offset;
                             }
                         } else {
-                            panic!("JumpIfFalse OpCode expect a value to be on the stack");
+                            unreachable!("JumpIfFalse OpCode expect a value to be on the stack");
                         }
                     }
                     OpCode::Jump(offset) => {
@@ -279,7 +310,7 @@ impl VM {
                                 self.chunks[self.current_chunk].current_instruction += *offset;
                             }
                         } else {
-                            panic!("JumpIfTrue OpCode expect a value to be on the stack");
+                            unreachable!("JumpIfTrue OpCode expect a value to be on the stack");
                         }
                     }
                     OpCode::Loop(loop_start) => {
@@ -305,7 +336,7 @@ impl VM {
                                 continue;
                             }
                             SquatValue::Object(SquatObject::NativeFunction(func)) => func.clone(),
-                            _ => panic!("Call OpCode expects a FunctionObject on the stack"),
+                            _ => unreachable!("Call OpCode expects a FunctionObject on the stack"),
                         };
 
                         let mut args = Vec::new();
@@ -338,7 +369,7 @@ impl VM {
                                     _ => unreachable!(),
                                 }
                             }
-                            _ => panic!("CreateInstace OpCode expects a Class on the stack"),
+                            _ => unreachable!("CreateInstace OpCode expects a Class on the stack"),
                         };
                     }
                     OpCode::Return => {
