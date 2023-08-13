@@ -1038,20 +1038,14 @@ impl<'a> Compiler<'a> {
         let set_op_code: OpCode;
         let get_op_code: OpCode;
         let variable_type: SquatType;
-        let mut object_data: SquatType = Default::default();
         let mut is_object: bool = false;
 
         if let Some((index, t)) = self.resolve_local(&var_name) {
             set_op_code = OpCode::SetLocal(index);
             get_op_code = OpCode::GetLocal(index);
             match t.clone() {
-                SquatType::Function(_) => {
+                SquatType::Function(_) | SquatType::Instance(_) => {
                     is_object = true;
-                    object_data = t.clone();
-                }
-                SquatType::Instance(_) => {
-                    is_object = true;
-                    object_data = t.clone();
                 }
                 _ => {}
             }
@@ -1060,17 +1054,8 @@ impl<'a> Compiler<'a> {
             set_op_code = OpCode::SetGlobal(index);
             get_op_code = OpCode::GetGlobal(index);
             match t.clone() {
-                SquatType::Function(_) => {
+                SquatType::Function(_) | SquatType::Class(_) | SquatType::Instance(_) => {
                     is_object = true;
-                    object_data = t.clone();
-                }
-                SquatType::Class(_) => {
-                    is_object = true;
-                    object_data = t.clone();
-                }
-                SquatType::Instance(_) => {
-                    is_object = true;
-                    object_data = t.clone();
                 }
                 _ => {}
             };
@@ -1080,7 +1065,6 @@ impl<'a> Compiler<'a> {
             get_op_code = OpCode::GetNative(index);
             if let SquatType::NativeFunction(_) = t.clone() {
                 is_object = true;
-                object_data = t.clone();
             }
             variable_type = t;
         } else {
@@ -1108,11 +1092,11 @@ impl<'a> Compiler<'a> {
             self.write_op_code(get_op_code);
             if is_object {
                 if self.check_current(TokenType::LeftParenthesis) {
-                    return self.call(object_data.clone());
+                    return self.call(variable_type.clone());
                 } else if self.check_current(TokenType::Dot) {
-                    return self.property(object_data.clone());
+                    return self.property(variable_type.clone());
                 }
-                return object_data;
+                return variable_type;
             }
         }
 
