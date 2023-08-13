@@ -1091,7 +1091,9 @@ impl<'a> Compiler<'a> {
         } else {
             self.write_op_code(get_op_code);
             if is_object {
-                if self.check_current(TokenType::Dot) {
+                if self.check_current(TokenType::LeftParenthesis) {
+                    return self.call(variable_type.clone());
+                } else if self.check_current(TokenType::Dot) {
                     return self.property(variable_type.clone());
                 }
                 return variable_type;
@@ -1285,7 +1287,7 @@ impl<'a> Compiler<'a> {
             | TokenType::LessEqual => self.binary(expected_type),
             TokenType::And => self.and(),
             TokenType::Or => self.or(),
-            TokenType::LeftParenthesis => self.call(expected_type.unwrap()),
+            // TokenType::LeftParenthesis => self.call(expected_type.unwrap()),
             _ => {
                 dbg!(&self.previous_token);
                 dbg!(&self.current_token);
