@@ -943,13 +943,13 @@ impl<'a> Compiler<'a> {
         if self.check_current(TokenType::LeftParenthesis) {
             return self.call(return_type);
         } else if self.check_current(TokenType::Dot) {
-            return self.property(return_type);
+            return self.property(return_type, None);
         }
 
         return_type
     }
 
-    fn property(&mut self, object_data: SquatType) -> SquatType {
+    fn property(&mut self, object_data: SquatType, get_op_code: Option<OpCode>) -> SquatType {
         match object_data {
             SquatType::Instance(data) => {
                 let class_name = data.class.clone();
@@ -958,21 +958,29 @@ impl<'a> Compiler<'a> {
                     &format!("Expected property name for {}", class_name),
                 );
                 let property_name = self.previous_token.as_ref().unwrap().lexeme.clone();
-                let field_result = self
+                match self
                     .classes
                     .get(&class_name)
                     .unwrap()
                     .get_field_type_and_index_by_name(&property_name)
-                    .clone();
-
-                match field_result {
-                    Ok((field_type, index)) => {
-                        self.write_op_code(OpCode::GetProperty(index));
+                    .clone()
+                {
+                    Ok((field_type, property_index)) => {
+                        match get_op_code {
+                            Some(OpCode::GetGlobal(object_index)) => self.write_op_code(
+                                OpCode::GetGlobalProperty(object_index, property_index),
+                            ),
+                            Some(OpCode::GetLocal(object_index)) => self.write_op_code(
+                                OpCode::GetLocalProperty(object_index, property_index),
+                            ),
+                            None => self.write_op_code(OpCode::GetProperty(property_index)),
+                            Some(_) => unreachable!(),
+                        };
                         field_type
                     }
-                    Err(()) => {
+                    Err(_) => {
                         self.compile_error(&format!(
-                            "{} does not have a property called {}.",
+                            "{} does not have a property called {}",
                             class_name, property_name
                         ));
                         SquatType::Nil
@@ -1117,19 +1125,22 @@ impl<'a> Compiler<'a> {
             self.expression_with_type(Some(variable_type.clone()));
             self.write_op_code(set_op_code);
         } else {
-            self.write_op_code(get_op_code);
             match object_type {
                 ObjectType::Class | ObjectType::Function => {
+                    self.write_op_code(get_op_code);
                     if self.check_current(TokenType::LeftParenthesis) {
                         return self.call(variable_type);
                     }
                 }
                 ObjectType::Instance => {
                     if self.check_current(TokenType::Dot) {
-                        return self.property(variable_type);
+                        return self.property(variable_type, Some(get_op_code));
                     }
+                    self.write_op_code(get_op_code)
                 }
-                _ => {}
+                _ => {
+                    self.write_op_code(get_op_code);
+                }
             };
         }
 

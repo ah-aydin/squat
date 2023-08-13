@@ -1,0 +1,11 @@
+class Person {
+    string name;
+    int age;
+    int height;
+}
+
+Person global_person = Person("global guy", 99, 200);
+
+func main() {
+    println("The name of the global person is: " + global_person.name);
+}

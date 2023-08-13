@@ -219,13 +219,40 @@ impl VM {
                     OpCode::GetNative(index) => {
                         self.stack.push(self.natives[*index].get_value().clone());
                     }
-                    OpCode::GetProperty(index) => {
+                    OpCode::GetGlobalProperty(object_index, property_index) => {
+                        if let Some(Some(SquatValue::Object(SquatObject::Instance(
+                            instance_data,
+                        )))) = self.globals.get(*object_index)
+                        {
+                            self.stack.push(instance_data.get_property(*property_index));
+                        } else {
+                            unreachable!(
+                                "GetGlobalProperty expected a class instance at global position {}",
+                                object_index
+                            );
+                        }
+                    }
+                    OpCode::GetLocalProperty(object_index, property_index) => {
+                        let stack_index =
+                            object_index + self.call_stack.last().unwrap().stack_index;
+                        if let Some(SquatValue::Object(SquatObject::Instance(instance_data))) =
+                            self.stack.get(stack_index)
+                        {
+                            self.stack.push(instance_data.get_property(*property_index));
+                        } else {
+                            unreachable!(
+                                "GetLocalProperty expected a class instance at stack index {}",
+                                stack_index
+                            );
+                        }
+                    }
+                    OpCode::GetProperty(property_index) => {
                         if let Some(SquatValue::Object(SquatObject::Instance(instance))) =
                             self.stack.pop()
                         {
-                            self.stack.push(instance.get_property(*index));
+                            self.stack.push(instance.get_property(*property_index));
                         } else {
-                            panic!(
+                            unreachable!(
                                 "GetProperty OpCode expects a class instance on top of the stack"
                             );
                         }
