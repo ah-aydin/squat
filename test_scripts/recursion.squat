@@ -10,8 +10,7 @@ func fib(int depth) int {
 }
 
 func main() {
-    println("Gib index of fibonaci number");
-    var fib_location = to_int(input());
+    var fib_location = 10;
     print("Fibonaci number at location ");
     print(fib_location);
     print(" is ");

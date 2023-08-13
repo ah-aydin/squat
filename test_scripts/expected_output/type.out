@@ -1,0 +1,13 @@
+Compiling and running file: test_scripts/type.squat
+1 is not 2
+false<type Bool>
+0
+1
+2
+3
+4
+5
+a
+aa
+aaa
+0<type Int>

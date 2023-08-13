@@ -1,0 +1,25 @@
+Compiling and running file: test_scripts/function_params.squat
+hello there
+This is <func func0>
+This is <func func0> with param: 10
+The sum of the values are13
+var m is 2<type Int>
+The very important function sum is 100
+Calling call_a_func_with_param_int
+Calling func <func func1> with param 124357
+This is <func func0> with param: 125591
+The returned value is: Calling function with 2 int and return int param
+The value is 198. Returning value times 2
+396
+hello there
+This is <func func0>
+This is <func func0> with param: 10
+The sum of the values are 13
+var m is: 2<type Int>
+The very important function sum is: 100
+Calling call_a_func_with_param_int
+Calling func <func func1> with param 124357
+This is <func func0> with param: 125591
+The returned value is: Calling function with 2 int and return int param
+The value is 198. Returning value times 2
+396

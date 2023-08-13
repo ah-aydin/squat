@@ -1,0 +1,8 @@
+Compiling and running file: test_scripts/class.squat
+<class Person>
+<instance of Person [String("gigel"), Int(20), Int(184)]>
+gigel
+The sum of the age and height is 204
+204
+<type Int>
+Both people have in total 41 years lived
