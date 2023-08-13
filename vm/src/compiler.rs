@@ -1107,7 +1107,7 @@ impl<'a> Compiler<'a> {
         }
 
         if self.check_current(TokenType::Equal) {
-            if object_type != ObjectType::NotObject {
+            if object_type == ObjectType::Function || object_type == ObjectType::Class {
                 self.compile_error(&format!(
                     "Cannot change assignment of an object of type '{:?}': {}",
                     object_type, var_name

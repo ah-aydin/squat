@@ -24,4 +24,7 @@ func main() {
 
     int height = Person("meh", 10, 170).height;
     println(height);
+
+    person = Person("reassign person", 123, 123);
+    println(person.name);
 }

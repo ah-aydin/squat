@@ -9,6 +9,6 @@ func main() {
     println(Person(10, 111, "meh").height + height);
 
     Person person1 = Person(10, 170, "gigel");
-    //person1 = Person(170, 10, "gigel2");
-    println(person1);
+    person1 = Person(170, 10, "new name");
+    println(person1.name);
 }
