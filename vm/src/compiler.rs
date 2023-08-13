@@ -87,6 +87,13 @@ pub struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
+    /// Returns a compiler for the given source
+    ///
+    /// # Arguments
+    /// * `source` - Source code
+    /// * `main_chunk` - The chunk that will contain the compiled byte code
+    /// * `constants` - Constants that will be used in the program
+    /// * `natives` - Native functions defined in the VM
     pub fn new(
         source: &'a String,
         main_chunk: &'a mut Chunk,
@@ -118,6 +125,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    /// Starts the compilation process and returns the `CompilationStatus`
     pub fn compile(&mut self) -> CompileStatus {
         self.advance();
 
