@@ -28,7 +28,7 @@ def main():
         run_vm(script_name)
         if compare_output_files(script_name):
             success += 1
-            print(f"{GREEN}Test {i}/{len(squat_files)} ({script_name}) passed{ENDC}")
+            print(f"Test {i}/{len(squat_files)} ({script_name}) passed")
         else:
             print(f"{RED}Test {i}/{len(squat_files)} ({script_name}) failed{ENDC}")
     print(f"{success}/{len(squat_files)} passed")

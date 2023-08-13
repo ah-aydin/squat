@@ -21,4 +21,7 @@ func main() {
 
     Person person2 = Person("kebab chef", 21, 140);
     println("Both people have in total " + to_str(person.age + person2.age) + " years lived");
+
+    int height = Person("meh", 10, 170).height;
+    println(height);
 }

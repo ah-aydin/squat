@@ -880,7 +880,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn call(&mut self, object_data: SquatType) -> SquatType {
-        match object_data {
+        let return_type = match object_data {
             SquatType::Function(data) | SquatType::NativeFunction(data) => {
                 let mut arg_count = 0;
                 if !self.check_current(TokenType::RightParenthesis) {
@@ -930,7 +930,15 @@ impl<'a> Compiler<'a> {
                 data.get_instance_type()
             }
             _ => unreachable!("call"),
+        };
+
+        if self.check_current(TokenType::LeftParenthesis) {
+            return self.call(return_type);
+        } else if self.check_current(TokenType::Dot) {
+            return self.property(return_type);
         }
+
+        return_type
     }
 
     fn property(&mut self, object_data: SquatType) -> SquatType {
@@ -1060,30 +1068,30 @@ impl<'a> Compiler<'a> {
         if let Some((index, t)) = self.resolve_local(&var_name) {
             set_op_code = OpCode::SetLocal(index);
             get_op_code = OpCode::GetLocal(index);
-            match t.clone() {
+            variable_type = t;
+            match variable_type {
                 SquatType::Function(_) | SquatType::Instance(_) => {
                     is_object = true;
                 }
                 _ => {}
             }
-            variable_type = t;
         } else if let Some((index, t)) = self.resolve_global(&var_name) {
             set_op_code = OpCode::SetGlobal(index);
             get_op_code = OpCode::GetGlobal(index);
-            match t.clone() {
+            variable_type = t;
+            match variable_type {
                 SquatType::Function(_) | SquatType::Class(_) | SquatType::Instance(_) => {
                     is_object = true;
                 }
                 _ => {}
             };
-            variable_type = t;
         } else if let Some((index, t)) = self.resolve_native(&var_name) {
             set_op_code = OpCode::Nil; // Just to keep the compiler happy
             get_op_code = OpCode::GetNative(index);
-            if let SquatType::NativeFunction(_) = t.clone() {
+            variable_type = t;
+            if let SquatType::NativeFunction(_) = variable_type {
                 is_object = true;
             }
-            variable_type = t;
         } else {
             self.compile_error(&format!("{} is not defined.", var_name));
             return SquatType::Nil;
@@ -1304,7 +1312,6 @@ impl<'a> Compiler<'a> {
             | TokenType::LessEqual => self.binary(expected_type),
             TokenType::And => self.and(),
             TokenType::Or => self.or(),
-            // TokenType::LeftParenthesis => self.call(expected_type.unwrap()),
             _ => {
                 dbg!(&self.previous_token);
                 dbg!(&self.current_token);

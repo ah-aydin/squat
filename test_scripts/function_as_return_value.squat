@@ -1,0 +1,11 @@
+func add(int number1, int number2) int {
+    return number1 + number2;
+}
+
+func get_func() func(int, int) int {
+    return add;
+}
+
+func main() {
+    println(get_func()(10, 20));
+}

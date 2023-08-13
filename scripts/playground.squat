@@ -1,0 +1,14 @@
+class Person {
+    int age;
+    int height;
+    string name;
+}
+
+func main() {
+    int height = Person(10, 170, "meh").height;
+    println(Person(10, 111, "meh").height + height);
+
+    Person person1 = Person(10, 170, "gigel");
+    //person1 = Person(170, 10, "gigel2");
+    println(person1);
+}
