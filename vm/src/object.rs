@@ -60,15 +60,13 @@ impl SquatFunction {
 #[derive(Debug, Clone)]
 pub struct SquatNativeFunction {
     pub name: String,
-    pub arity: usize,
     function: NativeFunc,
 }
 
 impl SquatNativeFunction {
-    pub fn new(name: &str, arity: usize, function: NativeFunc) -> SquatNativeFunction {
+    pub fn new(name: &str, function: NativeFunc) -> SquatNativeFunction {
         SquatNativeFunction {
             name: name.to_string(),
-            arity,
             function,
         }
     }

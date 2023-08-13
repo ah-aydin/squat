@@ -466,7 +466,7 @@ impl VM {
         func: native::NativeFunc,
         func_data: SquatFunctionTypeData,
     ) {
-        let native_func = SquatNativeFunction::new(name, func_data.get_arity(), func);
+        let native_func = SquatNativeFunction::new(name, func);
         let native_object = SquatObject::NativeFunction(native_func);
         let native_value = SquatValue::Object(native_object);
 
