@@ -1107,7 +1107,7 @@ impl<'a> Compiler<'a> {
         }
 
         if self.check_current(TokenType::Equal) {
-            if object_type == ObjectType::Function || object_type == ObjectType::Class {
+            if object_type == ObjectType::Class || object_type == ObjectType::Function {
                 self.compile_error(&format!(
                     "Cannot change assignment of an object of type '{:?}': {}",
                     object_type, var_name
@@ -1118,14 +1118,19 @@ impl<'a> Compiler<'a> {
             self.write_op_code(set_op_code);
         } else {
             self.write_op_code(get_op_code);
-            if object_type != ObjectType::NotObject {
-                if self.check_current(TokenType::LeftParenthesis) {
-                    return self.call(variable_type.clone());
-                } else if self.check_current(TokenType::Dot) {
-                    return self.property(variable_type.clone());
+            match object_type {
+                ObjectType::Class | ObjectType::Function => {
+                    if self.check_current(TokenType::LeftParenthesis) {
+                        return self.call(variable_type);
+                    }
                 }
-                return variable_type;
-            }
+                ObjectType::Instance => {
+                    if self.check_current(TokenType::Dot) {
+                        return self.property(variable_type);
+                    }
+                }
+                _ => {}
+            };
         }
 
         variable_type
