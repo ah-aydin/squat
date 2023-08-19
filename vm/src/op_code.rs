@@ -37,6 +37,8 @@ pub enum OpCode {
     SetGlobalProperty(usize, usize),
     SetLocalProperty(usize, usize),
 
+    Index,
+
     JumpTo(usize),
     JumpIfFalse(usize),
     Jump(usize),

@@ -289,6 +289,37 @@ impl VM {
                         }
                     }
 
+                    OpCode::Index => {
+                        if let Some(SquatValue::Int(index)) = self.stack.pop() {
+                            if let Some(indexed_value) = self.stack.pop() {
+                                match indexed_value {
+                                    SquatValue::String(value) => {
+                                        if value.len() as i64 <= index {
+                                            self.runtime_error(&format!("Index out of range, max possible index is {} but {} was given", value.len() - 1, index));
+                                        } else if index < 0 {
+                                            self.runtime_error(&format!(
+                                                "Given index {} is a negative number",
+                                                index
+                                            ));
+                                        } else {
+                                            self.stack.push(SquatValue::String(String::from(
+                                                value.as_bytes()[index as usize] as char,
+                                            )));
+                                        }
+                                    }
+                                    _ => unreachable!(
+                                        "Unexpected type on the stack for OpCode Index {:?}",
+                                        indexed_value
+                                    ),
+                                }
+                            } else {
+                                unreachable!("Index OpCode expects a value on the stack after the index integer is poped")
+                            }
+                        } else {
+                            unreachable!("Index OpCode expects an Int on top of the stack")
+                        }
+                    }
+
                     OpCode::JumpTo(instruction_number) => {
                         self.chunks[self.current_chunk].current_instruction = *instruction_number;
                     }

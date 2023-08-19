@@ -20,7 +20,8 @@ def compare_output_files(script_name):
 
 def main():
     squat_files = [filename[:-6] for filename in os.listdir("test_scripts") if filename.endswith(".squat")]
-    
+    squat_files = sorted(squat_files)    
+
     i = 0
     success = 0
     for script_name in squat_files:

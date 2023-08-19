@@ -1010,6 +1010,16 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    fn index(&mut self, squat_type: SquatType) -> SquatType {
+        self.expression_with_type(Some(SquatType::Int));
+        self.consume_current(TokenType::RightBracket, "Expected closing ']'.");
+        self.write_op_code(OpCode::Index);
+        match squat_type {
+            SquatType::String => SquatType::String,
+            _ => unreachable!(),
+        }
+    }
+
     fn expression_with_type(&mut self, expected_type: Option<SquatType>) -> SquatType {
         self.parse_precedence(Precedence::Assignment, expected_type)
     }
@@ -1158,6 +1168,10 @@ impl<'a> Compiler<'a> {
                     self.write_op_code(get_op_code);
                 }
             };
+        }
+
+        if variable_type == SquatType::String && self.check_current(TokenType::LeftBracket) {
+            return self.index(variable_type);
         }
 
         variable_type
