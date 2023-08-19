@@ -4,12 +4,12 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Default)]
-pub struct SquatClass {
+pub struct SquatStruct {
     pub name: String,
 }
-impl SquatClass {
-    pub fn new(name: &str) -> SquatClass {
-        SquatClass {
+impl SquatStruct {
+    pub fn new(name: &str) -> SquatStruct {
+        SquatStruct {
             name: name.to_string(),
         }
     }
@@ -84,7 +84,7 @@ impl SquatNativeFunction {
 pub enum SquatObject {
     Function(SquatFunction),
     NativeFunction(SquatNativeFunction),
-    Class(SquatClass),
+    Struct(SquatStruct),
     Instance(SquatInstance),
 }
 
@@ -93,7 +93,7 @@ impl SquatObject {
         match self {
             SquatObject::Function(_) => SquatType::Function(Default::default()),
             SquatObject::NativeFunction(_) => SquatType::NativeFunction(Default::default()),
-            SquatObject::Class(_) => SquatType::Class(Default::default()),
+            SquatObject::Struct(_) => SquatType::Struct(Default::default()),
             SquatObject::Instance(_) => SquatType::Instance(Default::default()),
         }
     }
@@ -104,7 +104,7 @@ impl ToString for SquatObject {
         match self {
             SquatObject::Function(func) => format!("<func {}>", func.name),
             SquatObject::NativeFunction(func) => format!("<native func {}>", func.name),
-            SquatObject::Class(class) => format!("<class {}>", class.name),
+            SquatObject::Struct(class) => format!("<class {}>", class.name),
             SquatObject::Instance(instance) => format!(
                 "<instance of {} {:?}>",
                 instance.instance_of, instance.properties
@@ -122,7 +122,9 @@ impl PartialEq for SquatObject {
             (SquatObject::NativeFunction(func1), SquatObject::NativeFunction(func2)) => {
                 func1.name == func2.name
             }
-            (SquatObject::Class(class1), SquatObject::Class(class2)) => class1.name == class2.name,
+            (SquatObject::Struct(class1), SquatObject::Struct(class2)) => {
+                class1.name == class2.name
+            }
             (SquatObject::Instance(instance1), SquatObject::Instance(instance2)) => {
                 instance1 == instance2
             }

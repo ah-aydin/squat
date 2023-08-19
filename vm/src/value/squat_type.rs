@@ -2,27 +2,27 @@ use std::{collections::HashMap, fmt};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SquatInstanceTypeData {
-    pub class: String,
+    pub struct_name: String,
 }
 
 impl SquatInstanceTypeData {
-    pub fn new(class: &str) -> SquatInstanceTypeData {
+    pub fn new(struct_name: &str) -> SquatInstanceTypeData {
         SquatInstanceTypeData {
-            class: class.to_owned(),
+            struct_name: struct_name.to_owned(),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct SquatClassTypeData {
+pub struct SquatStructTypeData {
     pub name: String,
     field_types: Vec<SquatType>,
     fields: HashMap<String, (SquatType, usize)>,
 }
 
-impl SquatClassTypeData {
-    pub fn new(name: &str) -> SquatClassTypeData {
-        SquatClassTypeData {
+impl SquatStructTypeData {
+    pub fn new(name: &str) -> SquatStructTypeData {
+        SquatStructTypeData {
             name: name.to_string(),
             field_types: vec![],
             fields: HashMap::new(),
@@ -117,7 +117,7 @@ pub enum SquatType {
     Bool,
     Function(SquatFunctionTypeData),
     NativeFunction(SquatFunctionTypeData),
-    Class(SquatClassTypeData),
+    Struct(SquatStructTypeData),
     Instance(SquatInstanceTypeData),
     Type,
     Number,
@@ -158,8 +158,8 @@ impl fmt::Display for SquatType {
                     .join(" "),
                 data.get_return_type()
             ),
-            SquatType::Class(data) => write!(f, "<type Class {}>", data.name),
-            SquatType::Instance(data) => write!(f, "<type Instance of {}>", data.class),
+            SquatType::Struct(data) => write!(f, "<type Struct {}>", data.name),
+            SquatType::Instance(data) => write!(f, "<type Instance of {}>", data.struct_name),
             SquatType::Type => write!(f, "<type Type>"),
             SquatType::Any => write!(f, "<type Any>"),
             SquatType::Number => write!(f, "<type Number>"),
@@ -185,7 +185,7 @@ impl PartialEq for SquatType {
             | (SquatType::Float, SquatType::Number) => true,
             (SquatType::Function(data), SquatType::Function(data2))
             | (SquatType::NativeFunction(data), SquatType::NativeFunction(data2)) => data == data2,
-            (SquatType::Class(data), SquatType::Class(data2)) => data == data2,
+            (SquatType::Struct(data), SquatType::Struct(data2)) => data == data2,
             (SquatType::Instance(data), SquatType::Instance(data2)) => data == data2,
             (_, _) => false,
         }

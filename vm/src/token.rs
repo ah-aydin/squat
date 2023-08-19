@@ -36,8 +36,7 @@ pub enum TokenType {
 
     // Keywords
     And,
-    Break,
-    Class,
+    Struct,
     Else,
     Extends,
     False,
@@ -47,9 +46,7 @@ pub enum TokenType {
     Nil,
     Or,
     Return,
-    Static,
     Super,
-    This,
     True,
     Var,
     While,

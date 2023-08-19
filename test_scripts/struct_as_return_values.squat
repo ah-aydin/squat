@@ -1,4 +1,4 @@
-class Person {
+struct Person {
     int age;
     int height;
     string name;

@@ -1,4 +1,4 @@
-Compiling and running file: test_scripts/class.squat
+Compiling and running file: test_scripts/struct.squat
 <class Person>
 <instance of Person [String("gigel"), Int(20), Int(184)]>
 gigel
@@ -8,3 +8,4 @@ The sum of the age and height is 204
 Both people have in total 41 years lived
 170
 reassign person
+<instance of Person [String("person1person2"), Int(45), Int(355)]>

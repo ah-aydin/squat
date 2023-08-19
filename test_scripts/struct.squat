@@ -1,4 +1,4 @@
-class Person {
+struct Person {
     string name;
     int age;
     int height;
@@ -6,6 +6,10 @@ class Person {
 
 func func1() {
     println("This is func 1");
+}
+
+func add2Persons(Person person1, Person person2) Person {
+    return Person(person1.name + person2.name, person1.age + person2.age, person1.height + person2.height);
 }
 
 func main() {
@@ -27,4 +31,10 @@ func main() {
 
     person = Person("reassign person", 123, 123);
     println(person.name);
+
+    Person person1toAdd = Person("person1", 25, 175);
+    Person person2toAdd = Person("person2", 20, 180);
+
+    Person addedPerson = add2Persons(person1toAdd, person2toAdd);
+    println(addedPerson);
 }

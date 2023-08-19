@@ -354,13 +354,13 @@ impl VM {
                         let arg_count = *arg_count;
                         let class_data_location = self.stack.len() - 1 - arg_count;
                         match self.stack.get(class_data_location).unwrap() {
-                            SquatValue::Object(SquatObject::Class(_)) => {
+                            SquatValue::Object(SquatObject::Struct(_)) => {
                                 let mut args = Vec::new();
                                 for _i in 0..arg_count {
                                     args.push(self.stack.pop().unwrap())
                                 }
                                 match self.stack.pop() {
-                                    Some(SquatValue::Object(SquatObject::Class(class_data))) => {
+                                    Some(SquatValue::Object(SquatObject::Struct(class_data))) => {
                                         args.reverse();
                                         self.stack.push(SquatValue::Object(SquatObject::Instance(
                                             SquatInstance::new(&class_data.name, args),

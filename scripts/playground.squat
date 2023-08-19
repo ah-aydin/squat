@@ -1,45 +1,17 @@
-class Person {
+struct Person {
     int age;
     int height;
     string name;
 }
 
-Person global_guy = Person(10, 123, "global");
+func add2Persons(Person person1, Person person2) Person {
+    return Person(person1.age + person2.age, person1.height + person2.height, person1.name + person2.name);
+}
 
 func main() {
-    Person person = Person(30, 120, "short guy");
-    int a = 1;
-    int b = 2;
+    Person person1 = Person(25, 175, "person1");
+    Person person2 = Person(20, 180, "person2");
 
-    a = b = person.age;
-    println(a);
-    println(b);
-
-    println("Before change");
-    println(person);
-    
-    person.age = 40;
-    person.height = 200;
-    person.name = "now dis guy is tall guy";
-
-    println("After change");
-    println(person);
-
-    person.age = a = b = 321;
-    println(person.age);
-    println(a);
-    println(b);
-    println(person);
-
-    person.name = "new name";
-    println(person);
-
-    println(global_guy);
-    global_guy.name = "ofya";
-    println(global_guy);
-    person.name = global_guy.name;
-    println(person);
-    person.name = global_guy.name = "last name";
-    println(person);
-    println(global_guy);
+    Person addedPerson = add2Persons(person1, person2);
+    println(addedPerson);
 }

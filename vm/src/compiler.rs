@@ -4,10 +4,10 @@ use std::collections::HashMap;
 
 use crate::chunk::Chunk;
 use crate::lexer::{Lexer, LexerError};
-use crate::object::{SquatClass, SquatFunction, SquatObject};
+use crate::object::{SquatFunction, SquatObject, SquatStruct};
 use crate::op_code::OpCode;
 use crate::token::{Token, TokenType};
-use crate::value::squat_type::{SquatClassTypeData, SquatFunctionTypeData, SquatType};
+use crate::value::squat_type::{SquatFunctionTypeData, SquatStructTypeData, SquatType};
 use crate::value::{squat_value::SquatValue, ValueArray};
 use variable::{CompilerGlobal, CompilerLocal};
 
@@ -66,7 +66,7 @@ pub enum CompileStatus {
 #[derive(Clone, Copy)]
 enum ScopeType {
     Global,
-    Class,
+    Struct,
     Function,
 }
 
@@ -79,7 +79,7 @@ pub struct Compiler<'a> {
 
     globals: HashMap<String, CompilerGlobal>,
     natives: &'a Vec<CompilerNative>,
-    classes: HashMap<String, SquatClassTypeData>,
+    structs: HashMap<String, SquatStructTypeData>,
     constants: &'a mut ValueArray,
 
     locals: Vec<CompilerLocal>,
@@ -117,7 +117,7 @@ impl<'a> Compiler<'a> {
 
             globals: HashMap::new(),
             natives,
-            classes: HashMap::new(),
+            structs: HashMap::new(),
             constants,
 
             locals: Vec::with_capacity(INITIAL_LOCALS_VECTOR_SIZE),
@@ -181,17 +181,17 @@ impl<'a> Compiler<'a> {
             self.var_declaration(Some(SquatType::String));
             return true;
         } else if self
-            .classes
+            .structs
             .get(&self.current_token.as_ref().unwrap().lexeme)
             .is_some()
         {
-            let class_data = self
-                .classes
+            let struct_data = self
+                .structs
                 .get(&self.current_token.as_ref().unwrap().lexeme)
                 .unwrap()
                 .clone();
             self.advance();
-            self.var_declaration(Some(class_data.get_instance_type()));
+            self.var_declaration(Some(struct_data.get_instance_type()));
             return true;
         }
         false
@@ -241,7 +241,9 @@ impl<'a> Compiler<'a> {
             } else {
                 match self.scope_type {
                     ScopeType::Global => self.function_declaration(),
-                    ScopeType::Class => todo!("Implement class methods"),
+                    ScopeType::Struct => {
+                        self.compile_error("Cannot declare a function inside a struct")
+                    }
                     _ => self.compile_error("Cannot declare a function in local scope"),
                 }
             }
@@ -251,10 +253,10 @@ impl<'a> Compiler<'a> {
                 ScopeType::Function => self.return_statement(expected_return_type.unwrap()),
                 _ => self.compile_error("Cannot return from outside a function."),
             }
-        } else if self.check_current(TokenType::Class) {
+        } else if self.check_current(TokenType::Struct) {
             match self.scope_type {
-                ScopeType::Global => self.class_declaration(),
-                _ => self.compile_error("Cannot declare a class in local scope"),
+                ScopeType::Global => self.struct_declaration(),
+                _ => self.compile_error("Cannot declare a struct in local scope"),
             }
         } else {
             match self.scope_type {
@@ -268,70 +270,70 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    fn class_declaration(&mut self) {
-        let (index, name) = match self.parse_variable("Expect class name") {
+    fn struct_declaration(&mut self) {
+        let (index, name) = match self.parse_variable("Expect struct name") {
             Ok((index, name)) => (index, name),
             Err(_) => return,
         };
 
-        let mut class_data = SquatClassTypeData::new(&name);
+        let mut struct_data = SquatStructTypeData::new(&name);
         self.initialize_object(&name);
         let jump = self.emit_jump(OpCode::Jump(usize::MAX));
 
         let old_scope_type = self.scope_type;
-        self.scope_type = ScopeType::Class;
+        self.scope_type = ScopeType::Struct;
 
-        self.class_block(&mut class_data);
+        self.struct_block(&mut struct_data);
 
         self.patch_jump(jump);
-        self.patch_class(&name, class_data.clone());
+        self.patch_struct(&name, struct_data.clone());
 
-        self.classes.insert(name.clone(), class_data);
+        self.structs.insert(name.clone(), struct_data);
 
-        let class_object = SquatObject::Class(SquatClass::new(&name));
-        let constant_index = self.constants.write(SquatValue::Object(class_object));
+        let struct_object = SquatObject::Struct(SquatStruct::new(&name));
+        let constant_index = self.constants.write(SquatValue::Object(struct_object));
         self.write_op_code(OpCode::Constant(constant_index));
         self.define_object(index);
 
         self.scope_type = old_scope_type;
     }
 
-    fn class_block(&mut self, data: &mut SquatClassTypeData) {
-        self.consume_current(TokenType::LeftBrace, "Expected '{' before class body");
+    fn struct_block(&mut self, data: &mut SquatStructTypeData) {
+        self.consume_current(TokenType::LeftBrace, "Expected '{' before struct body");
         while !self.check_current(TokenType::RightBrace) {
             if self.check_current(TokenType::Eof) {
-                self.compile_error("Expected closing '}' to end the class body");
+                self.compile_error("Expected closing '}' to end the struct body");
                 break;
             }
             if self.check_current(TokenType::Var) {
-                self.compile_error("Cannot use 'Var' to define class field");
+                self.compile_error("Cannot use 'Var' to define struct field");
             } else if self.check_current(TokenType::BoolType) {
-                self.define_class_field(data, SquatType::Bool);
+                self.define_struct_field(data, SquatType::Bool);
             } else if self.check_current(TokenType::IntType) {
-                self.define_class_field(data, SquatType::Int);
+                self.define_struct_field(data, SquatType::Int);
             } else if self.check_current(TokenType::FloatType) {
-                self.define_class_field(data, SquatType::Float);
+                self.define_struct_field(data, SquatType::Float);
             } else if self.check_current(TokenType::StringType) {
-                self.define_class_field(data, SquatType::String);
+                self.define_struct_field(data, SquatType::String);
             } else if self
-                .classes
+                .structs
                 .get(&self.current_token.as_ref().unwrap().lexeme)
                 .is_some()
             {
-                let class_data = self
-                    .classes
+                let struct_data = self
+                    .structs
                     .get(&self.current_token.as_ref().unwrap().lexeme)
                     .unwrap()
                     .clone();
                 self.advance();
-                self.define_class_field(data, SquatType::Class(class_data));
+                self.define_struct_field(data, SquatType::Struct(struct_data));
             } else {
                 todo!("Implement func");
             }
         }
     }
 
-    fn define_class_field(&mut self, data: &mut SquatClassTypeData, field_type: SquatType) {
+    fn define_struct_field(&mut self, data: &mut SquatStructTypeData, field_type: SquatType) {
         if !self.check_current(TokenType::Identifier) {
             self.compile_error("Expected field name");
             return;
@@ -499,9 +501,9 @@ impl<'a> Compiler<'a> {
                     self.compile_error(&format!("Cannot declare native function"));
                     None
                 }
-                SquatType::Class(data) => {
-                    var_type = SquatType::Class(data);
-                    self.compile_error(&format!("Must define class"));
+                SquatType::Struct(data) => {
+                    var_type = SquatType::Struct(data);
+                    self.compile_error(&format!("Must define struct"));
                     None
                 }
                 _ => unreachable!("var_declaration"),
@@ -548,13 +550,13 @@ impl<'a> Compiler<'a> {
                 }
             }
             TokenType::Identifier => {
-                if let Some(class_data) = self
-                    .classes
+                if let Some(struct_data) = self
+                    .structs
                     .get(&self.current_token.as_ref().unwrap().lexeme)
                     .cloned()
                 {
                     self.advance();
-                    return Some(class_data.get_instance_type());
+                    return Some(struct_data.get_instance_type());
                 }
                 None
             }
@@ -636,18 +638,18 @@ impl<'a> Compiler<'a> {
         self.globals.get_mut(name).unwrap().initialized = true;
     }
 
-    fn patch_class(&mut self, name: &str, data: SquatClassTypeData) {
+    fn patch_struct(&mut self, name: &str, data: SquatStructTypeData) {
         if self.scope_depth > 0 {
             self.locals
                 .last_mut()
                 .unwrap()
-                .set_type(SquatType::Class(data));
+                .set_type(SquatType::Struct(data));
             return;
         }
         self.globals
             .get_mut(name)
             .unwrap()
-            .set_type(SquatType::Class(data));
+            .set_type(SquatType::Struct(data));
     }
 
     fn patch_function(&mut self, name: &str, data: SquatFunctionTypeData) {
@@ -912,7 +914,7 @@ impl<'a> Compiler<'a> {
                 self.write_op_code(OpCode::Call(arg_count));
                 data.get_return_type()
             }
-            SquatType::Class(data) => {
+            SquatType::Struct(data) => {
                 let mut arg_count = 0;
                 if !self.check_current(TokenType::RightParenthesis) {
                     while !self.check_current(TokenType::RightParenthesis)
@@ -952,15 +954,15 @@ impl<'a> Compiler<'a> {
     fn property(&mut self, object_data: SquatType, get_op_code: Option<OpCode>) -> SquatType {
         match object_data {
             SquatType::Instance(data) => {
-                let class_name = data.class.clone();
+                let struct_name = data.struct_name.clone();
                 self.consume_current(
                     TokenType::Identifier,
-                    &format!("Expected property name for {}", class_name),
+                    &format!("Expected property name for {}", struct_name),
                 );
                 let property_name = self.previous_token.as_ref().unwrap().lexeme.clone();
                 match self
-                    .classes
-                    .get(&class_name)
+                    .structs
+                    .get(&struct_name)
                     .unwrap()
                     .get_field_type_and_index_by_name(&property_name)
                     .clone()
@@ -995,14 +997,14 @@ impl<'a> Compiler<'a> {
                     Err(_) => {
                         self.compile_error(&format!(
                             "{} does not have a property called {}",
-                            class_name, property_name
+                            struct_name, property_name
                         ));
                         SquatType::Nil
                     }
                 }
             }
             _ => {
-                self.compile_error("Can only use '.' to fetch property of a class instance");
+                self.compile_error("Can only use '.' to fetch property of a struct instance");
                 SquatType::Nil
             }
         }
@@ -1111,7 +1113,7 @@ impl<'a> Compiler<'a> {
             match variable_type {
                 SquatType::Function(_) => object_type = ObjectType::Function,
                 SquatType::Instance(_) => object_type = ObjectType::Instance,
-                SquatType::Class(_) => object_type = ObjectType::Class,
+                SquatType::Struct(_) => object_type = ObjectType::Class,
                 _ => object_type = ObjectType::NotObject,
             };
         } else if let Some((index, t)) = self.resolve_native(&var_name) {
